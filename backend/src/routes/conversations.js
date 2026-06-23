@@ -7,6 +7,11 @@ const { gradeConversation } = require("../utils/grading");
 const { sendResultsEmail } = require("../utils/emailResults");
 const { syncUserProgress } = require("../services/userProgress");
 const {
+  createSessionAttemptForConversation,
+  finalizeSessionAttemptFromSubmission,
+  getOrCreateSessionAttemptForConversation,
+} = require("../services/sessionAttempts");
+const {
   calculateCasePointsAwarded,
   getSubmissionAvailablePoints,
   getSubmissionEarnedPoints,
@@ -52,6 +57,12 @@ router.post("/", async (req, res, next) => {
         userId: user.id,
         caseId: caseRecord.id
       }
+    });
+
+    await createSessionAttemptForConversation({
+      userId: user.id,
+      caseRecordId: caseRecord.id,
+      conversationId: conversation.id,
     });
 
     res.json({ conversationId: conversation.id });
@@ -256,6 +267,8 @@ router.post("/:id/submit", async (req, res, next) => {
       return;
     }
 
+    const sessionAttempt = await getOrCreateSessionAttemptForConversation(conversation);
+
     const caseId = conversation.patientCase.caseId;
     const [caseData, gradingData] = await Promise.all([
       loadCase(caseId),
@@ -294,9 +307,10 @@ router.post("/:id/submit", async (req, res, next) => {
       earnedPoints: result.earned_points ?? 0,
     });
 
-    await prisma.submission.create({
+    const submission = await prisma.submission.create({
       data: {
         conversationId: conversation.id,
+        sessionAttemptId: sessionAttempt?.id,
         score: result.score,
         feedback: result.feedback,
         details: {
@@ -317,6 +331,13 @@ router.post("/:id/submit", async (req, res, next) => {
         }
       }
     });
+
+    if (sessionAttempt) {
+      await finalizeSessionAttemptFromSubmission({
+        sessionAttemptId: sessionAttempt.id,
+        submission,
+      });
+    }
 
     const progressSummary = await syncUserProgress(user.id);
 

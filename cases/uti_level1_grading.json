@@ -1,0 +1,586 @@
+{
+  "case_id": "uti_level1",
+  "grading_version": "2.0",
+  "rubric": {
+    "profile": "CPI1",
+    "passing_score": 84,
+    "sections": [
+      {
+        "id": "professional",
+        "label": "Professional",
+        "max_points": 3
+      },
+      {
+        "id": "reporter",
+        "label": "Reporter",
+        "max_points": 37
+      },
+      {
+        "id": "interpreter",
+        "label": "Interpreter",
+        "max_points": 2
+      },
+      {
+        "id": "manager",
+        "label": "Manager",
+        "max_points": 2
+      },
+      {
+        "id": "educator_evaluator",
+        "label": "Educator/Evaluator",
+        "max_points": 2
+      }
+    ],
+    "reporter_point_model": {
+      "total_points": 37,
+      "history_points_target": 23,
+      "physical_exam_points_target": 12,
+      "case_presentation_points_target": 2,
+      "implementation_note": "Focused UTI station redistributes portions of broad ROS/virtual-exam expectations into targeted history and focused exam criteria while preserving total reporter points."
+    },
+    "common_criteria": [
+      "professional_intro_name",
+      "professional_intro_role_title",
+      {
+        "id": "professional_preferred_name",
+        "points": 0.5
+      },
+      "professional_identity_two_identifiers"
+    ],
+    "criteria": [
+      {
+        "id": "professional_telehealth_jurisdiction_safety",
+        "section": "professional",
+        "label": "Telehealth location, jurisdiction, and safety contingency",
+        "points": 1,
+        "enabled": false,
+        "omit_reason": "Omitted for this CPI1 UTI station because location/jurisdiction/technology contingency scripting is not consistently required in the provided case packet."
+      },
+      {
+        "id": "professional_communication_humanism",
+        "section": "professional",
+        "label": "Demonstrates professional communication and humanistic rapport",
+        "points": 0.5,
+        "source": "all",
+        "mode": "llm_or_rule",
+        "tags": ["professional"],
+        "prompt_hint": "Judge transcript-level professionalism and humanistic communication: respectful language, appropriate interview flow (open then focused questions), avoids unnecessary repetition/jargon, and shows empathy/consideration. Only score elements observable in text; do not score visual-only behaviors such as appearance, eye contact, posture, or camera setup.",
+        "fallback_rule": {
+          "groups": [
+            ["what brings you", "how can i help", "tell me more", "can you describe"],
+            ["thank you", "i understand", "i'm sorry", "that sounds", "appreciate you sharing"]
+          ],
+          "min_groups_matched": 1
+        }
+      },
+      {
+        "id": "reporter_chief_complaint",
+        "section": "reporter",
+        "label": "Elicits chief complaint with an open-ended question",
+        "points": 0.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician (not the patient) invites the chief complaint using an open-ended opener such as 'What brings you in today?' or 'How can I help you today?'.",
+        "rule": {
+          "any": [
+            "how can i help you today",
+            "what brings you in today",
+            "what brings you today",
+            "what brings you in"
+          ]
+        }
+      },
+      {
+        "id": "reporter_oldcarts_bundle",
+        "section": "reporter",
+        "label": "Elicits OLDCARTS symptom detail bundle",
+        "points": 2.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician (not the patient) elicits at least 5 OLDCARTS elements relevant to this UTI case (onset, location, duration, character, severity, timing, radiation, and what was tried/modifying factors).",
+        "rule": {
+          "min_groups_matched": 5,
+          "groups": [
+            ["onset", "when did", "started", "began"],
+            ["location", "where", "genital", "abdomen", "flank", "back"],
+            ["duration", "how long"],
+            ["character", "burning", "sharp"],
+            ["severity", "scale", "/10", "0 to 10", "1 to 10"],
+            ["timing", "constant", "intermittent", "end of urination", "at the end", "at the end of urination"],
+            ["radiation", "spread"],
+            ["treatment", "tried", "what have you tried", "better", "worse", "water", "drinking"]
+          ]
+        }
+      },
+      {
+        "id": "reporter_hpi_summary_oldcarts",
+        "section": "reporter",
+        "label": "HPI summary includes OLDCARTS-focused presenting illness synthesis",
+        "points": 2,
+        "source": "hpi",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "Evaluate the end-of-case HPI written by the user/clinician (not the patient). Award full credit when the HPI is a coherent 4-5 sentence presenting illness summary that captures at least 5 OLDCARTS-relevant elements for this UTI complaint.",
+        "rule": {
+          "min_groups_matched": 5,
+          "groups": [
+            ["onset", "started", "began", "for 2 days", "two days", "x2 days"],
+            ["urination", "urinary", "dysuria", "burning", "genital"],
+            ["duration", "during urination", "while urinating", "intermittent", "constant"],
+            ["character", "sharp", "burning pain", "pain with urination"],
+            ["severity", "/10", "2-3", "2/10", "3/10", "mild"],
+            ["timing", "today", "since", "worse", "first noticed"],
+            ["tried", "hydration", "water", "modifying factors", "nothing else"]
+          ]
+        }
+      },
+      {
+        "id": "reporter_frequency_urgency",
+        "section": "reporter",
+        "label": "Assesses urinary frequency/urgency",
+        "points": 2.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["frequency", "frequent", "urgency", "going more often", "urinate more", "pee more"]
+        }
+      },
+      {
+        "id": "reporter_hematuria",
+        "section": "reporter",
+        "label": "Assesses blood in urine details",
+        "points": 2.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["blood in urine", "hematuria", "blood when you urinate", "blood when you pee", "how much blood"]
+        }
+      },
+      {
+        "id": "reporter_fever_chills",
+        "section": "reporter",
+        "label": "Assesses fever/chills",
+        "points": 2.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history", "red_flag", "critical_fail"],
+        "rule": {
+          "any": ["fever", "chills", "temperature"]
+        }
+      },
+      {
+        "id": "reporter_flank_back_pain",
+        "section": "reporter",
+        "label": "Assesses flank/back pain",
+        "points": 2.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history", "red_flag", "critical_fail"],
+        "rule": {
+          "any": ["flank pain", "back pain", "side pain", "cva tenderness"]
+        }
+      },
+      {
+        "id": "reporter_nausea_vomiting",
+        "section": "reporter",
+        "label": "Assesses nausea/vomiting",
+        "points": 2.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history", "red_flag", "critical_fail"],
+        "rule": {
+          "any": ["nausea", "vomit", "vomiting", "throw up"]
+        }
+      },
+      {
+        "id": "reporter_vaginal_discharge_bleeding",
+        "section": "reporter",
+        "label": "Assesses vaginal discharge or bleeding",
+        "points": 3,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["vaginal discharge", "vaginal bleeding", "any vaginal discharge", "any vaginal bleeding"]
+        }
+      },
+      {
+        "id": "reporter_pregnancy_status",
+        "section": "reporter",
+        "label": "Assesses pregnancy status",
+        "points": 3.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history", "red_flag", "critical_fail"],
+        "rule": {
+          "any": ["pregnant", "pregnancy", "lmp", "last menstrual period", "pregnancy test"]
+        }
+      },
+      {
+        "id": "reporter_medication_allergies",
+        "section": "reporter",
+        "label": "Assesses allergies and current medications",
+        "points": 2,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician (not the patient) asks about medication/food allergies and asks what prescription/OTC/supplement medications the patient is currently using.",
+        "rule": {
+          "groups": [
+            ["allergies", "allergy", "medication allergies", "drug allergies", "food allergies"],
+            ["medications", "meds", "otc", "supplements", "herbal", "what are you taking"]
+          ],
+          "min_groups_matched": 1
+        }
+      },
+      {
+        "id": "reporter_sexual_history",
+        "section": "reporter",
+        "label": "Assesses sexual history/STI risk",
+        "points": 2.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["sexually active", "new partner", "partners", "sti", "std", "birth control", "condom"]
+        }
+      },
+      {
+        "id": "reporter_prior_uti_pmh",
+        "section": "reporter",
+        "label": "Assesses prior UTI and PMH/PSH context",
+        "points": 2,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician (not the patient) asks about prior UTI episodes plus relevant past medical/surgical/hospital history.",
+        "rule": {
+          "any": [
+            "previous uti",
+            "prior uti",
+            "had this before",
+            "past medical history",
+            "medical history",
+            "surgical history",
+            "hospitalization",
+            "history of uti"
+          ]
+        }
+      },
+      {
+        "id": "reporter_family_history_relevance",
+        "section": "reporter",
+        "label": "Assesses relevant family history",
+        "points": 0.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": [
+            "family history",
+            "runs in your family",
+            "parents medical history",
+            "siblings medical history",
+            "relatives with"
+          ]
+        }
+      },
+      {
+        "id": "reporter_social_substance_history",
+        "section": "reporter",
+        "label": "Assesses social substance history (alcohol/tobacco/drugs)",
+        "points": 1.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician (not the patient) screens at least two of alcohol use, tobacco/nicotine use, and recreational/illicit drug use.",
+        "rule": {
+          "groups": [
+            ["alcohol", "drink", "drinking"],
+            ["tobacco", "smoke", "smoking", "nicotine", "vape", "vaping"],
+            ["drug use", "drugs", "marijuana", "cannabis", "substance use", "illicit"]
+          ],
+          "min_groups_matched": 2
+        }
+      },
+      {
+        "id": "reporter_social_context_general",
+        "section": "reporter",
+        "label": "Assesses broader social context relevant to complaint",
+        "points": 0.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician (not the patient) asks at least one broader social-context factor relevant to care planning (for example occupation or school demands, support system, sleep, activity, nutrition, or safety/living context).",
+        "rule": {
+          "any": [
+            "support system",
+            "who do you live with",
+            "living situation",
+            "occupation",
+            "work",
+            "student",
+            "sleep",
+            "physical activity",
+            "exercise",
+            "nutrition",
+            "diet",
+            "safety at home"
+          ]
+        }
+      },
+      {
+        "id": "reporter_preventive_history_if_applicable",
+        "section": "reporter",
+        "label": "Assesses preventive health history when applicable",
+        "points": 0.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "When appropriate, the user/clinician (not the patient) asks at least one preventive-history item (for example recent preventive exam/screening or immunization context).",
+        "rule": {
+          "any": [
+            "immunization",
+            "vaccines",
+            "last physical",
+            "annual exam",
+            "screening",
+            "well woman",
+            "dental exam",
+            "eye exam"
+          ]
+        }
+      },
+      {
+        "id": "reporter_hydration_context",
+        "section": "reporter",
+        "label": "Assesses hydration/caffeine context",
+        "points": 0.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "rule": {
+          "any": ["hydration", "drink water", "fluid intake", "how much water", "coffee", "caffeine"]
+        }
+      },
+      {
+        "id": "reporter_focused_virtual_exam",
+        "section": "reporter",
+        "label": "Performs focused virtual exam inquiry",
+        "points": 2,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "rule": {
+          "any": ["abdominal pain", "back pain", "cva tenderness", "heart", "lungs", "exam"]
+        }
+      },
+      {
+        "id": "reporter_telehealth_tech_readiness",
+        "section": "reporter",
+        "label": "Assesses telehealth technology/equipment readiness",
+        "points": 1,
+        "enabled": false,
+        "omit_reason": "Omitted for this focused UTI case because technology readiness and home-device inventory are outside this station's expected history scope."
+      },
+      {
+        "id": "reporter_ros_minimum_systems",
+        "section": "reporter",
+        "label": "Meets minimum ROS breadth expectation",
+        "points": 1,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician (not the patient) addresses at least three relevant ROS domains in context of this complaint (for example constitutional, GI, GU, musculoskeletal/flank-back).",
+        "rule": {
+          "groups": [
+            ["fever", "chills", "temperature"],
+            ["nausea", "vomit", "vomiting", "appetite"],
+            [
+              "frequency",
+              "urgency",
+              "blood in urine",
+              "hematuria",
+              "vaginal discharge",
+              "vaginal bleeding",
+              "pregnant",
+              "lmp",
+              "last menstrual period"
+            ],
+            ["flank pain", "back pain", "side pain", "cva tenderness"]
+          ],
+          "min_groups_matched": 3
+        }
+      },
+      {
+        "id": "reporter_ros_pertinent_area_penalty",
+        "section": "reporter",
+        "label": "Penalty: misses pertinent ROS areas for this complaint",
+        "points": 0,
+        "source": "user",
+        "mode": "rule",
+        "tags": ["required_history"],
+        "penalty_if_missed": 1,
+        "prompt_hint": "Apply a -1 penalty when the user/clinician (not the patient) fails to assess all pertinent UTI ROS areas.",
+        "rule": {
+          "groups": [
+            ["fever", "chills", "temperature"],
+            ["flank pain", "back pain", "side pain", "cva tenderness"],
+            ["nausea", "vomit", "vomiting", "throw up"],
+            ["vaginal discharge", "vaginal bleeding"],
+            ["pregnant", "pregnancy", "lmp", "last menstrual period"]
+          ]
+        }
+      },
+      {
+        "id": "interpreter_working_diagnosis",
+        "section": "interpreter",
+        "label": "States plausible diagnosis",
+        "points": 2,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "rule": {
+          "any": ["urinary tract infection", "uti", "cystitis"]
+        }
+      },
+      {
+        "id": "manager_treatment_plan",
+        "section": "manager",
+        "label": "Provides treatment plan",
+        "points": 1,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_action"],
+        "rule": {
+          "any": ["antibiotic", "nitrofurantoin", "macrobid", "bactrim", "amoxicillin", "augmentin", "treatment plan"]
+        }
+      },
+      {
+        "id": "manager_followup_and_return_precautions",
+        "section": "manager",
+        "label": "Provides follow-up and return precautions",
+        "points": 0.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_action", "red_flag"],
+        "rule": {
+          "groups": [
+            ["follow up", "recheck", "one week", "1 week", "return visit"],
+            ["if worse", "fever", "flank pain", "vomiting", "emergency", "urgent care", "worsening symptoms"]
+          ]
+        }
+      },
+      {
+        "id": "manager_diagnostic_testing_discussion",
+        "section": "manager",
+        "label": "Discusses diagnostic testing (UA/culture) if indicated",
+        "points": 0.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_action"],
+        "prompt_hint": "The user/clinician (not the patient) discusses urinalysis/urine culture rationale now or as follow-up if symptoms persist or worsen.",
+        "rule": {
+          "groups": [
+            ["urinalysis", "ua", "urine test", "dipstick", "urine culture", "culture"],
+            ["if worse", "if persistent", "if not improving", "follow up", "recheck"]
+          ]
+        }
+      },
+      {
+        "id": "manager_telehealth_documentation_compliance",
+        "section": "manager",
+        "label": "Telehealth documentation/compliance elements",
+        "points": 1,
+        "enabled": false,
+        "omit_reason": "Omitted for CPI1 UTI student-scoring because modality/time/location/consent documentation is faculty-side charting and not required in this transcript station."
+      },
+      {
+        "id": "educator_hydration_education",
+        "section": "educator_evaluator",
+        "label": "Educates on hydration",
+        "points": 0.75,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_action"],
+        "rule": {
+          "any": ["hydration", "drink water", "push fluids", "fluid intake"]
+        }
+      },
+      {
+        "id": "educator_front_to_back_hygiene",
+        "section": "educator_evaluator",
+        "label": "Educates on front-to-back hygiene",
+        "points": 0.75,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_action"],
+        "rule": {
+          "any": ["wipe front to back", "front to back", "hygiene measures"]
+        }
+      },
+      {
+        "id": "educator_postcoital_voiding",
+        "section": "educator_evaluator",
+        "label": "Educates on urinating after intercourse",
+        "points": 0.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_action"],
+        "rule": {
+          "any": ["urinate after intercourse", "urinate after sex", "pee after sex"]
+        }
+      },
+      {
+        "id": "educator_teachback_check",
+        "section": "educator_evaluator",
+        "label": "Uses teach-back to confirm understanding",
+        "points": 1,
+        "enabled": false,
+        "omit_reason": "Omitted in this version because teach-back is not consistently represented in the current UTI case script and grading examples."
+      }
+    ]
+  },
+
+  "required_history_topics": [
+    "hematuria (blood in urine) timing/amount",
+    "vaginal discharge or bleeding",
+    "recent sexual activity / STI risk screening",
+    "symptom onset and duration",
+    "urinary frequency/urgency",
+    "fever or chills",
+    "flank pain",
+    "nausea or vomiting",
+    "pregnancy status",
+    "medication allergies",
+    "current medications/OTC/supplements",
+    "family history relevance",
+    "social history: alcohol/tobacco/drug use",
+    "broader social context relevant to care (occupation/support/sleep/activity/nutrition/safety)",
+    "preventive health history when applicable",
+    "review of systems breadth in context of complaint"
+  ],
+
+  "required_actions": [
+    "education: hydration",
+    "education: wipe front to back",
+    "education: urinate after intercourse",
+    "state whether UA would be helpful and plan follow-up testing if symptoms persist/worsen",
+    "confirm pregnancy status (LMP + OTC test result if already done)",
+    "provide telehealth-appropriate follow-up plan (recheck in ~1 week)",
+    "give return precautions for escalation (fever, flank pain, vomiting, worsening symptoms)"
+  ],
+
+  "critical_fails": [
+    "missed pregnancy status when patient is of childbearing age",
+    "failed to assess pyelonephritis red flags (fever/chills, flank pain, vomiting)"
+  ],
+
+  "scoring": {
+    "history_topic_points": 5,
+    "action_points": 10,
+    "critical_fail_penalty": 30,
+    "passing_score": 84
+  }
+}

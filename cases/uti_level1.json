@@ -1,0 +1,157 @@
+{
+  "case_id": "uti_level1",
+  "level": 1,
+  "display_title": "Level 1.1",
+  "setting": "telehealth_outpatient",
+  "time_allowed_minutes": 15,
+  "frame": "Outpatient telehealth OSCE",
+  "primary_tasks": [
+    "History of Present Illness",
+    "Focused Physical Examination",
+    "Plausible Diagnosis",
+    "Patient Plan and Education"
+  ],
+  
+  "patient_profile": {
+    "first_name": "Taylor",
+    "last_name": "Reed",
+    "preferred_name": "Taylor",
+    "date_of_birth": "2001-02-14",
+    "age": 25,
+    "sex": "female",
+    "communication_style": "friendly, not worried, cooperative",
+    "background": "college student"
+  },
+
+  "osce_opening": {
+    "student_intro": "Hello, my name is _________, I am a UF, DNP student. May I call you by your first name?",
+    "patient_name_permission": {
+      "yes": "Good to meet you. Yes, that’s fine.",
+      "no": "Good to meet you. I’d prefer you use my full name."
+    },
+    "student_prompt_variants": [
+      "How can I help you today?",
+      "What brings you in today?"
+    ],
+    "patient_chief_complaint_reply": "I am here because I have been having some burning with when I use the bathroom, when I urinate."
+  },
+
+  "social_history": {
+    "education": "University student (liberal arts major)",
+    "alcohol_use": "Occasional, not a lot",
+    "tobacco_use": "None",
+    "drug_use": {
+      "marijuana": "Tried a few times, didn’t like it",
+      "last_use": "More than 1 year ago",
+      "other_illicit_drugs": "None"
+    }
+  },
+
+  "presenting_info": {
+    "chief_complaint": "Burning when urinating",
+    "opening_statement": "I am here because I have been having some burning with when I use the bathroom, when I urinate."
+  },
+
+  "physical_exam_if_asked": {
+    "heart": "Regular rate and rhythm",
+    "lungs": "Clear in all fields",
+    "abdomen": "Bowel sounds present; soft; no tenderness",
+    "back": "No pain with percussion (no CVA tenderness)"
+  },
+
+  "irrelevant_exam_pushback": "Why would you have to look at that body part?",
+
+  "history": {
+    "family_history": {
+      "parents": "Alive and well",
+      "siblings": "One younger brother (15), alive and well",
+      "patient_attitude": "Patient says they don’t see why family history is relevant."
+    },
+    "old_carts": {
+      "onset": "2 days ago",
+      "location": "Burning in the genital area only; no abdominal pain",
+      "duration": "Burning occurs only during urination",
+      "character": "Mild sharp pain at the start of urination with burning throughout",
+      "radiation": "None",
+      "severity": "2–3/10 during urination",
+      "timing": "Blood first noticed today",
+      "modifying_factors": "Drank extra water last night; no other treatments tried"
+    },
+    "symptoms": {
+      "dysuria": true,
+      "urinary_frequency": true,
+      "urgency": false,
+      "hematuria": true
+    },
+    "urine_description": {
+      "color": "Dark yellow/amber",
+      "blood_observed": "Small amount of blood on toilet tissue when wiping"
+    },
+    "contextual_factors": {
+      "lifestyle": "Busy college schedule",
+      "caffeine_intake": "Drinks coffee regularly",
+      "hydration": "Drinking less water than usual"
+    },
+    "pertinent_negatives": [
+      "No fever",
+      "No chills",
+      "No flank pain",
+      "No nausea",
+      "No vomiting",
+      "No vaginal discharge",
+      "No vaginal bleeding",
+      "No genital rash",
+      "No abdominal pain",
+      "No back pain",
+      "No rectal bleeding",
+      "No rectal discharge"
+    ],
+    "past_medical_history": {
+      "overall_health": "Great; works out often",
+      "prior_illnesses": [
+        "UTI about 1 year ago (similar symptoms)"
+      ],
+      "hospitalizations": "None",
+      "surgeries": "None"
+    },
+    "pregnancy": {
+      "lmp_days_ago": 10,
+      "missed_periods": false,
+      "otc_test_taken": true,
+      "otc_test_result": "negative"
+    },
+    "prior_utis": {
+      "history": true,
+      "most_recent_episode": "Approximately 1 year ago",
+      "similar_symptoms": true
+    },
+    "allergies": ["none"],
+    "sexual_history": {
+      "sexually_active": true,
+      "partner_duration_months": 2,
+      "protection": "Condoms only",
+      "other_birth_control": false
+    },
+    "medications": []
+  },
+
+  "optional_clinical_data": {
+    "labs_available": false,
+    "available_tests": []
+  },
+
+  "hidden_truth": {
+    "primary_diagnosis": "Uncomplicated urinary tract infection (cystitis)",
+    "differentials": [
+      "vaginitis",
+      "STI/urethritis",
+      "interstitial cystitis"
+    ],
+    "red_flags": [
+      "fever > 101F",
+      "flank pain",
+      "vomiting",
+      "pregnancy"
+    ]
+  }
+}

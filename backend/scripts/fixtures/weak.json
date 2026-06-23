@@ -1,0 +1,23 @@
+{
+  "description": "Weak student — misses all critical fail items, should score well below 84%",
+  "case_id": "uti_level1",
+  "expected_min_score": 0,
+  "expected_max_score": 40,
+  "hpi": "",
+  "conversation": [
+    { "role": "user", "content": "Hello, my name is Sarah and I am a DNP student. Can you confirm your name and date of birth?" },
+    { "role": "assistant", "content": "I'm Taylor Reed, born February 14, 2001." },
+    { "role": "user", "content": "What brings you in today?" },
+    { "role": "assistant", "content": "I have been having burning when I urinate." },
+    { "role": "user", "content": "When did this start and where is the burning?" },
+    { "role": "assistant", "content": "2 days ago, in the genital area." },
+    { "role": "user", "content": "Have you had a UTI before? Any past medical history?" },
+    { "role": "assistant", "content": "Yes I had one about a year ago." },
+    { "role": "user", "content": "Do you drink alcohol?" },
+    { "role": "assistant", "content": "Occasionally." },
+    { "role": "user", "content": "I think you have a urinary tract infection — UTI." },
+    { "role": "assistant", "content": "Okay what do I do?" },
+    { "role": "user", "content": "I will prescribe an antibiotic for you. Make sure to drink plenty of water." },
+    { "role": "assistant", "content": "Thank you." }
+  ]
+}

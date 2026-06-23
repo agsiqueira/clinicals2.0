@@ -1,0 +1,30 @@
+{
+  "name": "clinicals-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js",
+    "test": "node --test test/*.test.js",
+    "test:presentation2": "npm test && npm run rubric:calibrate",
+    "rubric:audit": "node scripts/auditRubric.js",
+    "rubric:calibrate": "GRADING_LLM_DISABLED=true node scripts/calibrateRubric.js",
+    "prisma": "prisma",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "form-data": "^4.0.5",
+    "nodemailer": "^8.0.1"
+  },
+  "devDependencies": {
+    "prisma": "^5.22.0"
+  }
+}

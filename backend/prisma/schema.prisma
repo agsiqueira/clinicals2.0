@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ConversationStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
+model User {
+  id            String         @id @default(uuid())
+  clerkUserId   String         @unique
+  name          String?
+  email         String?
+  imageUrl      String?
+  createdAt     DateTime       @default(now())
+  conversations Conversation[]
+  progress      UserProgress?
+}
+
+model Case {
+  id            String            @id @default(uuid())
+  caseId        String            @unique
+  title         String
+  level         Int
+  setting       String?
+  active        Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  versions      CaseVersion[]
+  conversations Conversation[]
+  rubrics       GradingRubric[]
+}
+
+model CaseVersion {
+  id        String   @id @default(uuid())
+  caseId    String
+  version   Int
+  caseJson  Json
+  createdAt DateTime @default(now())
+
+  case Case @relation(fields: [caseId], references: [id])
+
+  @@unique([caseId, version])
+}
+
+model Conversation {
+  id          String             @id @default(uuid())
+  userId      String
+  caseId      String
+  status      ConversationStatus @default(IN_PROGRESS)
+  startedAt   DateTime           @default(now())
+  submittedAt DateTime?
+
+  user      User       @relation(fields: [userId], references: [id])
+  patientCase Case      @relation(fields: [caseId], references: [id])
+  messages  Message[]
+  submission Submission?
+}
+
+model Message {
+  id             String      @id @default(uuid())
+  conversationId String
+  role           MessageRole
+  content        String
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+}
+
+model Submission {
+  id             String   @id @default(uuid())
+  conversationId String   @unique
+  score          Int
+  feedback       String
+  details        Json?
+  submittedAt    DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+}
+
+model GradingRubric {
+  id         String   @id @default(uuid())
+  caseId     String
+  version    Int
+  rubricJson Json
+  createdAt  DateTime @default(now())
+
+  patientCase Case @relation(fields: [caseId], references: [id])
+
+  @@unique([caseId, version])
+}
+
+model UserProgress {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  level     Int      @default(1)
+  xp        Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}

@@ -100,6 +100,11 @@ export const api = {
   // to view previous attempts for a case
   getAttemptsByCase: (caseId, headers) => request(`/conversations/by-case/${caseId}`, { headers }),
 
+  // ---- Clinicals 2.0 roadmap
+  getLearningPaths: (headers) => request("/learning-paths", { headers }),
+  getPatientSessionOverview: (slug, headers) =>
+    request(`/learning-paths/patient-sessions/${slug}`, { headers }),
+
   // ---- Example resource calls (edit paths to match your backend)
   getCases: () => request("/cases"),
   getCaseById: (id) => request(`/cases/${id}`),

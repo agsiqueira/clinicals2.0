@@ -17,28 +17,69 @@ enum MessageRole {
   ASSISTANT
 }
 
+enum BadgeTier {
+  GOLD
+  SILVER
+  BRONZE
+  NONE
+}
+
+enum SessionAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  SCORED
+}
+
+enum XPEventType {
+  SESSION_STARTED
+  SESSION_COMPLETED
+  ACHIEVEMENT_EARNED
+  BADGE_AWARDED
+  STREAK_BONUS
+  MANUAL_ADJUSTMENT
+}
+
+enum PreceptorMessageType {
+  BRIEFING
+  DEBRIEFING
+  ACHIEVEMENT
+  IMPROVEMENT
+  STREAK
+  RE_ENGAGEMENT
+  GOAL
+  GENERAL
+}
+
 model User {
-  id            String         @id @default(uuid())
-  clerkUserId   String         @unique
-  name          String?
-  email         String?
-  imageUrl      String?
-  createdAt     DateTime       @default(now())
-  conversations Conversation[]
-  progress      UserProgress?
+  id                String                                @id @default(uuid())
+  clerkUserId       String                                @unique
+  name              String?
+  email             String?
+  imageUrl          String?
+  createdAt         DateTime                              @default(now())
+  conversations     Conversation[]
+  progress          UserProgress?
+  sessionAttempts   SessionAttempt[]
+  badgeAwards       BadgeAward[]
+  xpEvents          XPEvent[]
+  streak            Streak?
+  mentorAssessments MentorAssessment[]
+  preceptorMessages PreceptorMessage[]
+  readinessResults  OptionalProfessionalReadinessResult[]
 }
 
 model Case {
-  id            String            @id @default(uuid())
-  caseId        String            @unique
-  title         String
-  level         Int
-  setting       String?
-  active        Boolean           @default(true)
-  createdAt     DateTime          @default(now())
-  versions      CaseVersion[]
-  conversations Conversation[]
-  rubrics       GradingRubric[]
+  id              String           @id @default(uuid())
+  caseId          String           @unique
+  title           String
+  level           Int
+  setting         String?
+  active          Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  versions        CaseVersion[]
+  conversations   Conversation[]
+  rubrics         GradingRubric[]
+  patientSessions PatientSession[]
 }
 
 model CaseVersion {
@@ -61,10 +102,11 @@ model Conversation {
   startedAt   DateTime           @default(now())
   submittedAt DateTime?
 
-  user      User       @relation(fields: [userId], references: [id])
-  patientCase Case      @relation(fields: [caseId], references: [id])
-  messages  Message[]
-  submission Submission?
+  user           User            @relation(fields: [userId], references: [id])
+  patientCase    Case            @relation(fields: [caseId], references: [id])
+  messages       Message[]
+  submission     Submission?
+  sessionAttempt SessionAttempt?
 }
 
 model Message {
@@ -78,14 +120,16 @@ model Message {
 }
 
 model Submission {
-  id             String   @id @default(uuid())
-  conversationId String   @unique
-  score          Int
-  feedback       String
-  details        Json?
-  submittedAt    DateTime @default(now())
+  id               String   @id @default(uuid())
+  conversationId   String   @unique
+  sessionAttemptId String?  @unique
+  score            Int
+  feedback         String
+  details          Json?
+  submittedAt      DateTime @default(now())
 
-  conversation Conversation @relation(fields: [conversationId], references: [id])
+  conversation   Conversation    @relation(fields: [conversationId], references: [id])
+  sessionAttempt SessionAttempt? @relation(fields: [sessionAttemptId], references: [id])
 }
 
 model GradingRubric {
@@ -108,4 +152,272 @@ model UserProgress {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model PreceptorPersona {
+  id           String   @id @default(uuid())
+  slug         String   @unique
+  name         String
+  specialty    String?
+  description  String?
+  avatarUrl    String?
+  systemPrompt String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  learningPaths LearningPath[]
+}
+
+model LearningPath {
+  id                 String   @id @default(uuid())
+  preceptorPersonaId String?
+  slug               String   @unique
+  title              String
+  description        String?
+  active             Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  preceptorPersona PreceptorPersona? @relation(fields: [preceptorPersonaId], references: [id])
+  units            Unit[]
+
+  @@index([preceptorPersonaId])
+}
+
+model Unit {
+  id             String   @id @default(uuid())
+  learningPathId String
+  slug           String
+  title          String
+  description    String?
+  objective      String?
+  active         Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  learningPath LearningPath     @relation(fields: [learningPathId], references: [id])
+  sessions     PatientSession[]
+
+  @@unique([learningPathId, slug])
+  @@index([learningPathId])
+}
+
+model PatientSession {
+  id                  String   @id @default(uuid())
+  unitId              String
+  caseId              String
+  slug                String
+  title               String
+  objective           String?
+  description         String?
+  estimatedMinutesMin Int?
+  estimatedMinutesMax Int?
+  goldThreshold       Int      @default(84)
+  silverThreshold     Int      @default(50)
+  bronzeThreshold     Int      @default(1)
+  active              Boolean  @default(true)
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  unit         Unit             @relation(fields: [unitId], references: [id])
+  patientCase  Case             @relation(fields: [caseId], references: [id])
+  achievements Achievement[]
+  attempts     SessionAttempt[]
+  badgeAwards  BadgeAward[]
+
+  @@unique([unitId, slug])
+  @@index([caseId])
+}
+
+model Achievement {
+  id                    String   @id @default(uuid())
+  patientSessionId      String
+  slug                  String
+  title                 String
+  description           String?
+  competencyArea        String?
+  weightPercent         Float    @default(0)
+  maxPoints             Float    @default(100)
+  rubricCriterionIds    Json?
+  requiredForCompletion Boolean  @default(false)
+  active                Boolean  @default(true)
+  sortOrder             Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  patientSession     PatientSession      @relation(fields: [patientSessionId], references: [id])
+  achievementResults AchievementResult[]
+
+  @@unique([patientSessionId, slug])
+  @@index([patientSessionId])
+}
+
+model SessionAttempt {
+  id                   String               @id @default(uuid())
+  userId               String
+  patientSessionId     String
+  conversationId       String?              @unique
+  status               SessionAttemptStatus @default(IN_PROGRESS)
+  startedAt            DateTime             @default(now())
+  submittedAt          DateTime?
+  scoredAt             DateTime?
+  sessionScore         Float?
+  badgeTier            BadgeTier?
+  passed               Boolean?
+  clinicalScoreDetails Json?
+
+  user               User                                  @relation(fields: [userId], references: [id])
+  patientSession     PatientSession                        @relation(fields: [patientSessionId], references: [id])
+  conversation       Conversation?                         @relation(fields: [conversationId], references: [id])
+  submission         Submission?
+  achievementResults AchievementResult[]
+  badgeAwards        BadgeAward[]
+  xpEvents           XPEvent[]
+  feedback           SessionFeedback?
+  preceptorMessages  PreceptorMessage[]
+  readinessResults   OptionalProfessionalReadinessResult[]
+
+  @@index([userId])
+  @@index([patientSessionId])
+  @@index([userId, patientSessionId])
+}
+
+model AchievementResult {
+  id                    String   @id @default(uuid())
+  sessionAttemptId      String
+  achievementId         String
+  earnedPoints          Float    @default(0)
+  maxPoints             Float    @default(0)
+  percentScore          Float?
+  weightedScore         Float?
+  achieved              Boolean  @default(false)
+  rubricCriterionIds    Json?
+  rubricCriteriaResults Json?
+  evidence              Json?
+  feedback              String?
+  createdAt             DateTime @default(now())
+
+  sessionAttempt SessionAttempt @relation(fields: [sessionAttemptId], references: [id])
+  achievement    Achievement    @relation(fields: [achievementId], references: [id])
+
+  @@unique([sessionAttemptId, achievementId])
+  @@index([achievementId])
+}
+
+model SessionFeedback {
+  id               String   @id @default(uuid())
+  sessionAttemptId String   @unique
+  recognition      String?
+  coaching         String?
+  encouragement    String?
+  summary          String?
+  createdAt        DateTime @default(now())
+
+  sessionAttempt SessionAttempt @relation(fields: [sessionAttemptId], references: [id])
+}
+
+model BadgeAward {
+  id               String    @id @default(uuid())
+  userId           String
+  patientSessionId String
+  sessionAttemptId String
+  tier             BadgeTier
+  score            Float
+  awardedAt        DateTime  @default(now())
+
+  user           User           @relation(fields: [userId], references: [id])
+  patientSession PatientSession @relation(fields: [patientSessionId], references: [id])
+  sessionAttempt SessionAttempt @relation(fields: [sessionAttemptId], references: [id])
+
+  @@unique([userId, patientSessionId, sessionAttemptId])
+  @@index([userId])
+  @@index([patientSessionId])
+  @@index([sessionAttemptId])
+}
+
+model XPEvent {
+  id               String      @id @default(uuid())
+  userId           String
+  sessionAttemptId String?
+  type             XPEventType
+  points           Int
+  reason           String?
+  metadata         Json?
+  createdAt        DateTime    @default(now())
+
+  user           User            @relation(fields: [userId], references: [id])
+  sessionAttempt SessionAttempt? @relation(fields: [sessionAttemptId], references: [id])
+
+  @@index([userId])
+  @@index([sessionAttemptId])
+}
+
+model Streak {
+  id               String    @id @default(uuid())
+  userId           String    @unique
+  currentCount     Int       @default(0)
+  longestCount     Int       @default(0)
+  lastActivityDate DateTime?
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model MentorAssessment {
+  id                 String   @id @default(uuid())
+  userId             String
+  readinessLevel     String
+  summary            String
+  strengths          Json?
+  growthAreas        Json?
+  recommendation     String?
+  competencySnapshot Json?
+  createdAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model PreceptorMessage {
+  id               String               @id @default(uuid())
+  userId           String
+  sessionAttemptId String?
+  type             PreceptorMessageType
+  title            String?
+  body             String
+  metadata         Json?
+  readAt           DateTime?
+  createdAt        DateTime             @default(now())
+
+  user           User            @relation(fields: [userId], references: [id])
+  sessionAttempt SessionAttempt? @relation(fields: [sessionAttemptId], references: [id])
+
+  @@index([userId])
+  @@index([sessionAttemptId])
+}
+
+model OptionalProfessionalReadinessResult {
+  id                       String   @id @default(uuid())
+  sessionAttemptId         String
+  userId                   String
+  environmentReviewEnabled Boolean  @default(false)
+  appearanceReviewEnabled  Boolean  @default(false)
+  voiceAnalysisEnabled     Boolean  @default(false)
+  environmentResult        Json?
+  appearanceResult         Json?
+  voiceResult              Json?
+  communicationResult      Json?
+  feedback                 String?
+  createdAt                DateTime @default(now())
+
+  sessionAttempt SessionAttempt @relation(fields: [sessionAttemptId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([sessionAttemptId])
 }

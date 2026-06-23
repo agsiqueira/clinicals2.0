@@ -11,6 +11,7 @@
     "test:presentation2": "npm test && npm run rubric:calibrate",
     "rubric:audit": "node scripts/auditRubric.js",
     "rubric:calibrate": "GRADING_LLM_DISABLED=true node scripts/calibrateRubric.js",
+    "seed:clinicals2": "node scripts/seedClinicals2.js",
     "prisma": "prisma",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

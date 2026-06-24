@@ -164,6 +164,8 @@ type SubmissionResult = {
   case_points_awarded?: number | null;
   user_total_points?: number | null;
   user_level?: number | null;
+  hpi?: string | null;
+  submittedAt?: string | null;
   missed_required_questions: string[];
   missed_red_flags: string[];
   critical_fails_triggered: string[];
@@ -206,6 +208,15 @@ const DEBRIEF_QUICK_ACTIONS = [
   "How do I get Gold next time?",
   "Review my introduction",
 ];
+
+const FORMAL_INTRODUCTION_CRITERIA = [
+  "professional_intro_name",
+  "professional_intro_role_title",
+  "professional_preferred_name",
+  "professional_identity_two_identifiers",
+  "professional_communication_humanism",
+];
+const CHIEF_COMPLAINT_CRITERIA = ["reporter_chief_complaint"];
 
 function statusColor(status: string) {
   if (status === "met") return "#166534";
@@ -252,6 +263,8 @@ function normalizeSubmissionPayload(payload: any): SubmissionResult {
     case_points_awarded: payload?.case_points_awarded ?? details?.case_points_awarded ?? null,
     user_total_points: payload?.user_total_points ?? details?.user_total_points ?? null,
     user_level: payload?.user_level ?? details?.user_level ?? null,
+    hpi: payload?.hpi ?? details?.hpi ?? null,
+    submittedAt: payload?.submittedAt ?? payload?.submitted_at ?? details?.submittedAt ?? null,
     missed_required_questions: Array.isArray(payload?.missed_required_questions)
       ? payload.missed_required_questions
       : Array.isArray(details?.missed_required_questions)
@@ -306,6 +319,38 @@ function buildFallbackDebrief(result: SubmissionResult): Clinicals2Debrief {
   };
 }
 
+function formatResultDate(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString();
+}
+
+function summarizeCriteriaAchievement(
+  title: string,
+  criterionIds: string[],
+  criteriaResults: CriterionResult[]
+): Clinicals2AchievementResult {
+  const criteria = criteriaResults.filter((criterion) => criterionIds.includes(criterion.id));
+  const earnedPoints = criteria.reduce((sum, criterion) => sum + Number(criterion.earned_points || 0), 0);
+  const maxPoints = criteria.reduce((sum, criterion) => sum + Number(criterion.points || 0), 0);
+  const percentScore = maxPoints > 0 ? Math.round((earnedPoints / maxPoints) * 100) : 0;
+  const missed = criteria
+    .filter((criterion) => Number(criterion.earned_points || 0) < Number(criterion.points || 0))
+    .map((criterion) => criterion.label || criterion.id);
+
+  return {
+    achievementId: title.toLowerCase().replace(/\s+/g, "-"),
+    title,
+    earnedPoints,
+    maxPoints,
+    percentScore,
+    weightedScore: null,
+    achieved: percentScore >= 84,
+    feedback: missed.length > 0 ? `Review ${missed.slice(0, 2).join(", ")}.` : "Mapped criteria were met.",
+  };
+}
+
 export default function Level1Screen() {
   const params = useLocalSearchParams();
   const router = useRouter();
@@ -342,6 +387,7 @@ export default function Level1Screen() {
   const [debriefInput, setDebriefInput] = useState("");
   const [debriefSending, setDebriefSending] = useState(false);
   const [debriefError, setDebriefError] = useState<string | null>(null);
+  const [showDetailedRubric, setShowDetailedRubric] = useState(false);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [savedConversationId, setSavedConversationId] = useState<string | null>(null);
@@ -741,6 +787,7 @@ const { sound } = await Audio.Sound.createAsync(
     setDebriefInput("");
     setDebriefSending(false);
     setDebriefError(null);
+    setShowDetailedRubric(false);
     setSubmitError(null);
     setSavedConversationId(null);
     setShowResumePrompt(false);
@@ -995,13 +1042,14 @@ const { sound } = await Audio.Sound.createAsync(
         body: { hpi },
       });
 
-      setSubmissionResult(normalizeSubmissionPayload(data));
+      setSubmissionResult(normalizeSubmissionPayload({ ...data, hpi }));
       await deleteItemAsync(`conv_${caseId}`).catch(() => {});
       setStage("results");
       setDebriefMessages([]);
       setDebriefInput("");
       setDebriefSending(false);
       setDebriefError(null);
+      setShowDetailedRubric(false);
       setDebriefVisible(true);
     } catch (e: any) {
       const message = String(e?.message || "Failed to submit case.");
@@ -1026,6 +1074,7 @@ const { sound } = await Audio.Sound.createAsync(
             setDebriefInput("");
             setDebriefSending(false);
             setDebriefError(null);
+            setShowDetailedRubric(false);
             setDebriefVisible(true);
             return;
           }
@@ -1051,6 +1100,26 @@ const { sound } = await Audio.Sound.createAsync(
     if (!submissionResult) return null;
     return submissionResult.clinicals2Debrief || buildFallbackDebrief(submissionResult);
   }, [submissionResult]);
+
+  const reviewAchievementResults = useMemo(() => {
+    if (!submissionResult) return [];
+    if (visibleDebrief?.achievementResults?.length) return visibleDebrief.achievementResults;
+    return [
+      summarizeCriteriaAchievement(
+        "Formal Introduction",
+        FORMAL_INTRODUCTION_CRITERIA,
+        submissionResult.criteria_results
+      ),
+      summarizeCriteriaAchievement(
+        "Chief Complaint",
+        CHIEF_COMPLAINT_CRITERIA,
+        submissionResult.criteria_results
+      ),
+    ];
+  }, [submissionResult, visibleDebrief]);
+
+  const reviewBadgeLabel = visibleDebrief?.badgeLabel || badgeLabelFromTier(badgeTierFromScore(submissionResult?.score || 0));
+  const reviewSubmittedAt = formatResultDate(submissionResult?.submittedAt);
 
   const sendDebriefMessage = useCallback(
     async (messageOverride?: string) => {
@@ -1150,6 +1219,7 @@ const { sound } = await Audio.Sound.createAsync(
     setDebriefInput("");
     setDebriefSending(false);
     setDebriefError(null);
+    setShowDetailedRubric(false);
   }, [caseId, stopSpeechPlayback]);
 
   if (loadingCase) {
@@ -1227,15 +1297,21 @@ const { sound } = await Audio.Sound.createAsync(
                   </View>
                 </View>
 
-                <View style={caseStyles.debriefMentorBubble}>
-                  <Text style={caseStyles.debriefMentorLabel}>Dr. Martinez</Text>
-                  <Text style={caseStyles.debriefText}>
-                    {visibleDebrief.greeting || visibleDebrief.recognition}
-                  </Text>
-                </View>
-
                 <View style={caseStyles.debriefChatBox}>
                   <Text style={caseStyles.debriefSectionTitle}>Ask Dr. Martinez</Text>
+                  <View style={caseStyles.debriefChatMessages}>
+                    <View
+                      style={[
+                        caseStyles.debriefChatBubble,
+                        caseStyles.debriefChatBubbleAssistant,
+                      ]}
+                    >
+                      <Text style={caseStyles.debriefMentorLabel}>Dr. Martinez</Text>
+                      <Text style={caseStyles.debriefText}>
+                        {visibleDebrief.greeting || visibleDebrief.recognition}
+                      </Text>
+                    </View>
+                  </View>
                   <View style={caseStyles.debriefQuickActions}>
                     {DEBRIEF_QUICK_ACTIONS.map((action) => (
                       <Pressable
@@ -1441,87 +1517,145 @@ const { sound } = await Audio.Sound.createAsync(
 
         {stage === "results" && submissionResult ? (
           <FlatList
-            data={submissionResult.criteria_results}
+            data={showDetailedRubric ? submissionResult.criteria_results : []}
             keyExtractor={(item) => item.id}
             contentContainerStyle={caseStyles.resultsFlatListContent}
             ListHeaderComponent={
               <View style={caseStyles.resultsHeaderContainer}>
                 <View style={caseStyles.resultsCard}>
-
-                  {/* Score */}
-                  <View style={caseStyles.resultsScoreRow}>
-                    <Text style={caseStyles.resultsScoreText}>
-                      {submissionResult.score}%
-                    </Text>
-                    <Text style={[caseStyles.resultsPassText, { color: submissionResult.passed ? "#166534" : "#b91c1c" }]}>
-                      {submissionResult.passed ? "Passed ✓" : "Not passed"} · threshold {submissionResult.passing_score}%
-                    </Text>
+                  <Text style={caseStyles.resultsSectionHeading}>Summary</Text>
+                  <View style={caseStyles.resultsSummaryGrid}>
+                    <View style={caseStyles.resultsSummaryItem}>
+                      <Text style={caseStyles.resultsSummaryLabel}>Session</Text>
+                      <Text style={caseStyles.resultsSummaryValue}>
+                        {caseId === "uti_level1" ? "First Patient" : caseData?.display_title || "Patient Session"}
+                      </Text>
+                    </View>
+                    <View style={caseStyles.resultsSummaryItem}>
+                      <Text style={caseStyles.resultsSummaryLabel}>Score</Text>
+                      <Text style={caseStyles.resultsSummaryValue}>{submissionResult.score}%</Text>
+                    </View>
+                    <View style={caseStyles.resultsSummaryItem}>
+                      <Text style={caseStyles.resultsSummaryLabel}>Badge</Text>
+                      <Text style={caseStyles.resultsSummaryValue}>{reviewBadgeLabel}</Text>
+                    </View>
+                    {reviewSubmittedAt ? (
+                      <View style={caseStyles.resultsSummaryItem}>
+                        <Text style={caseStyles.resultsSummaryLabel}>Submitted</Text>
+                        <Text style={caseStyles.resultsSummaryValue}>{reviewSubmittedAt}</Text>
+                      </View>
+                    ) : null}
                   </View>
-
-                  {/* Points */}
-                  {submissionResult.earned_points != null && (
-                    <Text style={caseStyles.resultsPointsText}>
-                      {submissionResult.earned_points} / {submissionResult.available_points} available points
-                    </Text>
-                  )}
-
-                  {submissionResult.case_points_awarded != null ? (
-                    <Text style={caseStyles.resultsPointsText}>
-                      Case points earned: {submissionResult.case_points_awarded}
-                    </Text>
-                  ) : null}
-
-                  {submissionResult.user_total_points != null ? (
-                    <Text style={caseStyles.resultsPointsText}>
-                      Total user points: {submissionResult.user_total_points}
-                      {submissionResult.user_level != null ? ` · level ${submissionResult.user_level}` : ""}
-                    </Text>
-                  ) : null}
-
-                  {/* Critical fails */}
-                  {submissionResult.critical_fails_triggered.length > 0 && (
-                    <View style={caseStyles.resultsCriticalBox}>
-                      <Text style={caseStyles.resultsCriticalTitle}>Critical Fails</Text>
-                      {submissionResult.critical_fails_triggered.map((item) => (
-                        <Text key={item} style={caseStyles.resultsCriticalItem}>· {item}</Text>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Missed red flags */}
-                  {submissionResult.missed_red_flags.length > 0 && (
-                    <View style={caseStyles.resultsRedFlagBox}>
-                      <Text style={caseStyles.resultsRedFlagTitle}>Missed Red Flags</Text>
-                      {submissionResult.missed_red_flags.map((item) => (
-                        <Text key={item} style={caseStyles.resultsRedFlagItem}>· {item}</Text>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Missed history */}
-                  {submissionResult.missed_required_questions.length > 0 && (
-                    <View style={caseStyles.resultsMissedBox}>
-                      <Text style={caseStyles.resultsMissedTitle}>Missed History Items</Text>
-                      {submissionResult.missed_required_questions.map((item) => (
-                        <Text key={item} style={caseStyles.resultsMissedItem}>· {item}</Text>
-                      ))}
-                    </View>
-                  )}
                 </View>
 
                 <View style={caseStyles.resultsCard}>
-                  <Text style={caseStyles.resultsSectionTitle}>Section Scores</Text>
-                  {submissionResult.section_scores.map((section) => (
-                    <View key={section.section} style={caseStyles.resultsSectionRow}>
-                      <Text style={caseStyles.resultsSectionLabel}>{section.label || section.section}</Text>
-                      <Text style={caseStyles.resultsSectionPoints}>
-                        {section.earned_points}/{section.available_points}
+                  <Text style={caseStyles.resultsSectionHeading}>Achievement Results</Text>
+                  {reviewAchievementResults.map((achievement) => (
+                    <View key={achievement.achievementId} style={caseStyles.resultsAchievementRow}>
+                      <View style={caseStyles.resultsAchievementMain}>
+                        <Text style={caseStyles.resultsAchievementTitle}>{achievement.title}</Text>
+                        {!!achievement.feedback && (
+                          <Text style={caseStyles.resultsAchievementFeedback}>
+                            {achievement.feedback}
+                          </Text>
+                        )}
+                      </View>
+                      <Text style={caseStyles.resultsAchievementScore}>
+                        {Math.round(Number(achievement.percentScore || 0))}%
                       </Text>
                     </View>
                   ))}
                 </View>
 
-                <Text style={caseStyles.resultsSectionTitle}>Criterion Breakdown</Text>
+                <View style={caseStyles.resultsCard}>
+                  <Text style={caseStyles.resultsSectionHeading}>HPI / Submitted Report</Text>
+                  <Text style={caseStyles.resultsReportText}>
+                    {submissionResult.hpi || "No HPI text was stored with this submission."}
+                  </Text>
+                </View>
+
+                <View style={caseStyles.resultsCardSecondary}>
+                  <View style={caseStyles.resultsDetailHeader}>
+                    <View style={caseStyles.resultsDetailHeaderText}>
+                      <Text style={caseStyles.resultsSectionHeading}>Detailed Rubric / Technical Details</Text>
+                      <Text style={caseStyles.resultsMutedText}>
+                        Criteria, section scores, missed items, red flags, and point totals.
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => setShowDetailedRubric((current) => !current)}
+                      style={caseStyles.resultsToggleButton}
+                    >
+                      <Text style={caseStyles.resultsToggleButtonText}>
+                        {showDetailedRubric ? "Hide details" : "Show detailed rubric"}
+                      </Text>
+                    </Pressable>
+                  </View>
+
+                  {showDetailedRubric ? (
+                    <View style={caseStyles.resultsDetailContent}>
+                      {submissionResult.earned_points != null ? (
+                        <Text style={caseStyles.resultsPointsText}>
+                          Rubric points: {submissionResult.earned_points} / {submissionResult.available_points}
+                        </Text>
+                      ) : null}
+                      {submissionResult.case_points_awarded != null ? (
+                        <Text style={caseStyles.resultsPointsText}>
+                          Case points earned: {submissionResult.case_points_awarded}
+                        </Text>
+                      ) : null}
+                      {submissionResult.user_total_points != null ? (
+                        <Text style={caseStyles.resultsPointsText}>
+                          Total user points: {submissionResult.user_total_points}
+                          {submissionResult.user_level != null ? ` · level ${submissionResult.user_level}` : ""}
+                        </Text>
+                      ) : null}
+
+                      {submissionResult.critical_fails_triggered.length > 0 ? (
+                        <View style={caseStyles.resultsCriticalBox}>
+                          <Text style={caseStyles.resultsCriticalTitle}>Critical Fails</Text>
+                          {submissionResult.critical_fails_triggered.map((item) => (
+                            <Text key={item} style={caseStyles.resultsCriticalItem}>- {item}</Text>
+                          ))}
+                        </View>
+                      ) : null}
+
+                      {submissionResult.missed_red_flags.length > 0 ? (
+                        <View style={caseStyles.resultsRedFlagBox}>
+                          <Text style={caseStyles.resultsRedFlagTitle}>Missed Red Flags</Text>
+                          {submissionResult.missed_red_flags.map((item) => (
+                            <Text key={item} style={caseStyles.resultsRedFlagItem}>- {item}</Text>
+                          ))}
+                        </View>
+                      ) : null}
+
+                      {submissionResult.missed_required_questions.length > 0 ? (
+                        <View style={caseStyles.resultsMissedBox}>
+                          <Text style={caseStyles.resultsMissedTitle}>Missed History Items</Text>
+                          {submissionResult.missed_required_questions.map((item) => (
+                            <Text key={item} style={caseStyles.resultsMissedItem}>- {item}</Text>
+                          ))}
+                        </View>
+                      ) : null}
+
+                      {submissionResult.section_scores.length > 0 ? (
+                        <View style={caseStyles.resultsSectionDivider}>
+                          <Text style={caseStyles.resultsSectionTitle}>Section Scores</Text>
+                          {submissionResult.section_scores.map((section) => (
+                            <View key={section.section} style={caseStyles.resultsSectionRow}>
+                              <Text style={caseStyles.resultsSectionLabel}>{section.label || section.section}</Text>
+                              <Text style={caseStyles.resultsSectionPoints}>
+                                {section.earned_points}/{section.available_points}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+
+                      <Text style={caseStyles.resultsSectionTitle}>Criterion Breakdown</Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
             }
             ListFooterComponent={
@@ -1529,6 +1663,16 @@ const { sound } = await Audio.Sound.createAsync(
                 <Text style={caseStyles.resultsRetryNote}>
                   Retry starts a brand new attempt. Your highest point total for this case is the one kept.
                 </Text>
+                <Pressable
+                  onPress={() => router.push("/(tabs)/cases")}
+                  style={({ pressed }) => ({
+                    ...caseStyles.outlineButton,
+                    flex: undefined,
+                    opacity: pressed ? 0.7 : 1,
+                  })}
+                >
+                  <Text style={caseStyles.outlineButtonText}>Return to Roadmap</Text>
+                </Pressable>
                 <Pressable
                   onPress={retryCase}
                   style={({ pressed }) => ({

@@ -4,11 +4,13 @@ const { ensureCaseFromId } = require("../utils/caseSync");
 const { getOrCreateUser } = require("../utils/userResolver");
 const { loadCase, loadGrading } = require("../utils/caseLoader");
 const { gradeConversation } = require("../utils/grading");
+const { createPatientReply } = require("../llm/navigatorClient");
 const { sendResultsEmail } = require("../utils/emailResults");
 const { syncUserProgress } = require("../services/userProgress");
 const {
   createSessionAttemptForConversation,
   finalizeSessionAttemptFromSubmission,
+  getSessionDebriefForAttempt,
   getOrCreateSessionAttemptForConversation,
 } = require("../services/sessionAttempts");
 const {
@@ -17,6 +19,10 @@ const {
   getSubmissionEarnedPoints,
 } = require("../utils/progressSummary");
 const { buildAttemptSummaries } = require("../utils/attemptHistory");
+const {
+  buildDebriefChatSystemPrompt,
+  normalizeDebriefChatMessages,
+} = require("../utils/debriefChat");
 
 const router = express.Router();
 
@@ -145,6 +151,61 @@ router.post("/:id/messages", async (req, res, next) => {
   }
 });
 
+router.post("/:id/debrief-chat", async (req, res, next) => {
+  try {
+    const { message, messages } = req.body || {};
+    const userMessage = String(message || "").trim();
+    if (!userMessage) {
+      res.status(400).json({ error: "message is required" });
+      return;
+    }
+
+    const user = await resolveUser(req);
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: req.params.id },
+      include: {
+        submission: true,
+      },
+    });
+
+    if (!conversation) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+
+    if (conversation.userId !== user.id) {
+      res.status(403).json({ error: "Forbidden" });
+      return;
+    }
+
+    if (!conversation.submission) {
+      res.status(409).json({ error: "Debrief chat is available after submission" });
+      return;
+    }
+
+    const debrief =
+      (await getSessionDebriefForAttempt(conversation.submission.sessionAttemptId)) || {
+        sessionScore: conversation.submission.score,
+        badgeTier: "NONE",
+        achievementResults: [],
+      };
+
+    const chatMessages = [
+      ...normalizeDebriefChatMessages(messages),
+      { role: "user", content: userMessage },
+    ];
+
+    const reply = await createPatientReply({
+      systemPrompt: buildDebriefChatSystemPrompt({ debrief }),
+      messages: chatMessages,
+    });
+
+    res.json({ reply });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get("/:id", async (req, res, next) => {
   try {
     const user = await resolveUser(req);
@@ -167,6 +228,10 @@ router.get("/:id", async (req, res, next) => {
       return;
     }
 
+    const debrief = conversation.submission
+      ? await getSessionDebriefForAttempt(conversation.submission.sessionAttemptId)
+      : null;
+
     res.json({
       conversationId: conversation.id,
       caseId: conversation.patientCase.caseId,
@@ -183,7 +248,8 @@ router.get("/:id", async (req, res, next) => {
             score: conversation.submission.score,
             feedback: conversation.submission.feedback,
             details: conversation.submission.details,
-            submittedAt: conversation.submission.submittedAt
+            submittedAt: conversation.submission.submittedAt,
+            clinicals2Debrief: debrief
           }
         : null
     });
@@ -192,7 +258,7 @@ router.get("/:id", async (req, res, next) => {
   }
 });
 
-function buildSavedSubmissionResponse(conversation, progressSummary) {
+async function buildSavedSubmissionResponse(conversation, progressSummary) {
   const savedDetails = conversation.submission.details || {};
   const passingScore = Number(savedDetails.passing_score || 84);
   const passed =
@@ -207,6 +273,7 @@ function buildSavedSubmissionResponse(conversation, progressSummary) {
       level: conversation.patientCase.level,
       earnedPoints,
     });
+  const debrief = await getSessionDebriefForAttempt(conversation.submission.sessionAttemptId);
 
   return {
     score: conversation.submission.score,
@@ -229,7 +296,8 @@ function buildSavedSubmissionResponse(conversation, progressSummary) {
     missed_required_questions: savedDetails.missed_required_questions || [],
     missed_red_flags: savedDetails.missed_red_flags || [],
     critical_fails_triggered: savedDetails.critical_fails_triggered || [],
-    details: savedDetails
+    details: savedDetails,
+    clinicals2Debrief: debrief
   };
 }
 
@@ -263,7 +331,7 @@ router.post("/:id/submit", async (req, res, next) => {
 
     if (conversation.submission) {
       const progressSummary = await syncUserProgress(user.id);
-      res.json(buildSavedSubmissionResponse(conversation, progressSummary));
+      res.json(await buildSavedSubmissionResponse(conversation, progressSummary));
       return;
     }
 
@@ -332,11 +400,13 @@ router.post("/:id/submit", async (req, res, next) => {
       }
     });
 
+    let clinicals2Debrief = null;
     if (sessionAttempt) {
-      await finalizeSessionAttemptFromSubmission({
+      const finalizedAttempt = await finalizeSessionAttemptFromSubmission({
         sessionAttemptId: sessionAttempt.id,
         submission,
       });
+      clinicals2Debrief = finalizedAttempt?.debrief || null;
     }
 
     const progressSummary = await syncUserProgress(user.id);
@@ -357,6 +427,7 @@ router.post("/:id/submit", async (req, res, next) => {
       case_points_awarded: casePointsAwarded,
       user_total_points: progressSummary.totalPoints,
       user_level: progressSummary.level,
+      clinicals2Debrief,
     });
   } catch (err) {
     next(err);

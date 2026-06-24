@@ -127,6 +127,126 @@ export const caseStyles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  resultsCardSecondary: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 12,
+    padding: 12,
+    gap: 10,
+    marginBottom: 12,
+    backgroundColor: "#f9fafb",
+  },
+
+  resultsSectionHeading: {
+    color: "#111827",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+
+  resultsSummaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+
+  resultsSummaryItem: {
+    minWidth: "45%",
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: "#ffffff",
+  },
+
+  resultsSummaryLabel: {
+    color: "#6b7280",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  resultsSummaryValue: {
+    color: "#111827",
+    fontWeight: "800",
+    marginTop: 4,
+  },
+
+  resultsAchievementRow: {
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    borderRadius: 8,
+    backgroundColor: "#faf5ff",
+    padding: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  resultsAchievementMain: {
+    flex: 1,
+    gap: 4,
+  },
+
+  resultsAchievementTitle: {
+    color: "#111827",
+    fontWeight: "800",
+  },
+
+  resultsAchievementFeedback: {
+    color: "#6b7280",
+    lineHeight: 18,
+  },
+
+  resultsAchievementScore: {
+    color: "#6d28d9",
+    fontWeight: "800",
+  },
+
+  resultsReportText: {
+    color: "#1f2937",
+    lineHeight: 20,
+  },
+
+  resultsDetailHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  resultsDetailHeaderText: {
+    flex: 1,
+    gap: 4,
+  },
+
+  resultsMutedText: {
+    color: "#6b7280",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+
+  resultsToggleButton: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#ffffff",
+  },
+
+  resultsToggleButtonText: {
+    color: "#374151",
+    fontWeight: "800",
+  },
+
+  resultsDetailContent: {
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+    paddingTop: 10,
+    gap: 10,
+  },
+
   resultsScoreRow: {
     flexDirection: "row",
     alignItems: "baseline",
@@ -518,18 +638,6 @@ export const caseStyles = StyleSheet.create({
   debriefScoreRow: {
     flexDirection: "row",
     gap: 10,
-  },
-
-  debriefMentorBubble: {
-    alignSelf: "flex-start",
-    maxWidth: "94%",
-    borderWidth: 1,
-    borderColor: "#c7d2fe",
-    borderRadius: 8,
-    backgroundColor: "#eef2ff",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 4,
   },
 
   debriefMentorLabel: {

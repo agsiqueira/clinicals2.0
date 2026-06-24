@@ -15,7 +15,10 @@ function buildPreceptorChatSystemPrompt({ session, preceptorPersona }) {
     "Answer only about session goals, what the visible achievements mean, how to perform a formal introduction, how to elicit a chief complaint, and general encouragement.",
     "Do not reveal the diagnosis, hidden case facts, expected patient answers, exact grading answers, rubric internals beyond the visible achievements, or what the patient will say.",
     "If asked for restricted information, politely redirect to general clinical interviewing guidance.",
-    "Keep replies concise, supportive, and practical.",
+    "Answer only the student's question.",
+    "Keep each reply to 50-60 words maximum.",
+    "Avoid long explanations, lists, and multi-paragraph responses.",
+    "Use a supportive, practical tone.",
   ]
     .filter(Boolean)
     .join("\n");

@@ -65,52 +65,6 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.get("/patient-sessions/:slug", async (req, res, next) => {
-  try {
-    const user = await resolveUser(req);
-    if (!user) {
-      res.status(401).json({ error: "Missing x-clerk-user-id header" });
-      return;
-    }
-
-    const session = await prisma.patientSession.findFirst({
-      where: {
-        slug: req.params.slug,
-        active: true,
-      },
-      include: {
-        patientCase: true,
-        achievements: {
-          where: { active: true },
-        },
-        unit: {
-          include: {
-            learningPath: {
-              include: {
-                preceptorPersona: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!session) {
-      res.status(404).json({ error: "Patient session not found" });
-      return;
-    }
-
-    res.json(
-      buildSessionOverview({
-        session,
-        preceptorPersona: session.unit?.learningPath?.preceptorPersona,
-      })
-    );
-  } catch (err) {
-    next(err);
-  }
-});
-
 router.post("/patient-sessions/:slug/preceptor-chat", async (req, res, next) => {
   try {
     const user = await resolveUser(req);
@@ -167,6 +121,52 @@ router.post("/patient-sessions/:slug/preceptor-chat", async (req, res, next) => 
     });
 
     res.json({ reply });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get("/patient-sessions/:slug", async (req, res, next) => {
+  try {
+    const user = await resolveUser(req);
+    if (!user) {
+      res.status(401).json({ error: "Missing x-clerk-user-id header" });
+      return;
+    }
+
+    const session = await prisma.patientSession.findFirst({
+      where: {
+        slug: req.params.slug,
+        active: true,
+      },
+      include: {
+        patientCase: true,
+        achievements: {
+          where: { active: true },
+        },
+        unit: {
+          include: {
+            learningPath: {
+              include: {
+                preceptorPersona: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!session) {
+      res.status(404).json({ error: "Patient session not found" });
+      return;
+    }
+
+    res.json(
+      buildSessionOverview({
+        session,
+        preceptorPersona: session.unit?.learningPath?.preceptorPersona,
+      })
+    );
   } catch (err) {
     next(err);
   }

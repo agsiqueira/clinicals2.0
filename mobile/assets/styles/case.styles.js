@@ -538,13 +538,136 @@ export const caseStyles = StyleSheet.create({
     fontWeight: "800",
   },
 
+  debriefChatBox: {
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    borderRadius: 8,
+    padding: 12,
+    gap: 10,
+    backgroundColor: "#ffffff",
+  },
+
+  debriefQuickActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+
+  debriefQuickActionButton: {
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    borderRadius: 8,
+    backgroundColor: "#faf5ff",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+
+  debriefQuickActionText: {
+    color: "#5b21b6",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  debriefChatMessages: {
+    gap: 8,
+  },
+
+  debriefChatBubble: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 3,
+  },
+
+  debriefChatBubbleUser: {
+    alignSelf: "flex-end",
+    maxWidth: "88%",
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    backgroundColor: "#faf5ff",
+  },
+
+  debriefChatBubbleAssistant: {
+    alignSelf: "flex-start",
+    maxWidth: "92%",
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
+    backgroundColor: "#eef2ff",
+  },
+
+  debriefChatHint: {
+    color: "#6b7280",
+    fontSize: 13,
+  },
+
+  debriefChatInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+
+  debriefChatInput: {
+    flex: 1,
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#ffffff",
+  },
+
+  debriefChatSendButton: {
+    minHeight: 42,
+    minWidth: 58,
+    borderRadius: 8,
+    backgroundColor: "#6d28d9",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+
+  debriefChatSendText: {
+    color: "#ffffff",
+    fontWeight: "800",
+  },
+
+  debriefReportDivider: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+
+  debriefReportLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#e5e7eb",
+  },
+
+  debriefReportHeading: {
+    color: "#6b7280",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+
+  debriefReportPanel: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    backgroundColor: "#f9fafb",
+    padding: 12,
+    gap: 12,
+  },
+
   debriefMetricBox: {
     flex: 1,
     borderWidth: 1,
     borderColor: "#e5e7eb",
     borderRadius: 8,
     padding: 10,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#ffffff",
   },
 
   debriefMetricLabel: {

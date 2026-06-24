@@ -140,7 +140,7 @@ test("buildSessionDebriefPayload returns concise Dr. Martinez debrief data", () 
   assert.equal(debrief.badgeLabel, "Gold");
   assert.equal(
     debrief.greeting,
-    "Excellent work today. Review your report and take note of what contributed to your success. When you're ready, I'd be happy to discuss any part of it."
+    "Thanks for completing the session. As you review your report, pay particular attention to Formal Introduction and Chief Complaint. When you're ready, I'd be happy to discuss what happened and how to improve next time."
   );
   assert.equal(debrief.achievementResults.length, 2);
   assert.equal(debrief.achievementResults[0].title, "Formal Introduction");
@@ -149,7 +149,7 @@ test("buildSessionDebriefPayload returns concise Dr. Martinez debrief data", () 
   assert.match(debrief.encouragement, /Keep practicing/);
 });
 
-test("buildSessionDebriefPayload derives Silver and Bronze greeting focus from weakest achievement", () => {
+test("buildSessionDebriefPayload derives greeting focus from weakest achievement", () => {
   const silverDebrief = buildSessionDebriefPayload({
     sessionAttemptId: "attempt-silver",
     sessionScore: 67,
@@ -202,10 +202,10 @@ test("buildSessionDebriefPayload derives Silver and Bronze greeting focus from w
 
   assert.equal(
     silverDebrief.greeting,
-    "Good work today. Review your report and pay particular attention to Formal Introduction. When you're ready, let me know what you'd like to discuss."
+    "Thanks for completing the session. As you review your report, pay particular attention to Formal Introduction. When you're ready, I'd be happy to discuss what happened and how to improve next time."
   );
   assert.equal(
     bronzeDebrief.greeting,
-    "Thanks for completing the session. Review your report carefully, especially Chief Complaint. I'm here if you'd like to discuss it."
+    "Thanks for completing the session. As you review your report, pay particular attention to Chief Complaint. When you're ready, I'd be happy to discuss what happened and how to improve next time."
   );
 });

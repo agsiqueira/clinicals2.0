@@ -135,18 +135,9 @@ function formatFocusArea(titles) {
   return `${titles.slice(0, -1).join(", ")}, and ${titles[titles.length - 1]}`;
 }
 
-function buildDebriefGreeting({ badgeTier, achievementSummaries }) {
+function buildDebriefGreeting({ achievementSummaries }) {
   const focusArea = formatFocusArea(weakestAchievementTitles(achievementSummaries));
-
-  if (badgeTier === "GOLD") {
-    return "Excellent work today. Review your report and take note of what contributed to your success. When you're ready, I'd be happy to discuss any part of it.";
-  }
-
-  if (badgeTier === "SILVER") {
-    return `Good work today. Review your report and pay particular attention to ${focusArea}. When you're ready, let me know what you'd like to discuss.`;
-  }
-
-  return `Thanks for completing the session. Review your report carefully, especially ${focusArea}. I'm here if you'd like to discuss it.`;
+  return `Thanks for completing the session. As you review your report, pay particular attention to ${focusArea}. When you're ready, I'd be happy to discuss what happened and how to improve next time.`;
 }
 
 function buildSessionDebriefPayload({
@@ -178,7 +169,7 @@ function buildSessionDebriefPayload({
     sessionScore: score,
     badgeTier: tier,
     badgeLabel: badgeLabel(tier),
-    greeting: buildDebriefGreeting({ badgeTier: tier, achievementSummaries }),
+    greeting: buildDebriefGreeting({ achievementSummaries }),
     recognition: debrief.recognition,
     coaching: debrief.coaching,
     encouragement: debrief.encouragement,

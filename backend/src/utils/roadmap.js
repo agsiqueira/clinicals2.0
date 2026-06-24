@@ -45,6 +45,17 @@ function summarizeAchievement(achievement) {
   };
 }
 
+const HPI_RUBRIC_CRITERION_IDS = new Set(["reporter_hpi_summary_oldcarts"]);
+
+function patientSessionRequiresHpi(session) {
+  return (session.achievements || []).some((achievement) => {
+    const rubricCriterionIds = Array.isArray(achievement.rubricCriterionIds)
+      ? achievement.rubricCriterionIds
+      : [];
+    return rubricCriterionIds.some((id) => HPI_RUBRIC_CRITERION_IDS.has(id));
+  });
+}
+
 function summarizePatientSession(session, statusSummary) {
   return {
     id: session.id,
@@ -59,6 +70,10 @@ function summarizePatientSession(session, statusSummary) {
       silver: session.silverThreshold,
       bronze: session.bronzeThreshold,
     },
+    workflow: {
+      requiresHpi: patientSessionRequiresHpi(session),
+    },
+    requiresHpi: patientSessionRequiresHpi(session),
     achievements: (session.achievements || []).sort(sortByOrderAndTitle).map(summarizeAchievement),
     status: statusSummary.status,
     badgeTier: statusSummary.badgeTier,
@@ -123,6 +138,10 @@ function buildSessionOverview({ session, preceptorPersona }) {
       silver: session.silverThreshold,
       bronze: session.bronzeThreshold,
     },
+    workflow: {
+      requiresHpi: patientSessionRequiresHpi(session),
+    },
+    requiresHpi: patientSessionRequiresHpi(session),
     achievements: (session.achievements || []).sort(sortByOrderAndTitle).map(summarizeAchievement),
     preceptorBriefing: buildPreceptorBriefing({ session, preceptorPersona }),
     linkedCase: session.patientCase
@@ -169,4 +188,5 @@ module.exports = {
   buildSessionOverview,
   buildSessionStatus,
   determineBestAttempt: findBestAttempt,
+  patientSessionRequiresHpi,
 };

@@ -39,6 +39,10 @@ type RoadmapSession = {
     bronze: number;
   };
   achievements?: AchievementSummary[];
+  requiresHpi?: boolean;
+  workflow?: {
+    requiresHpi?: boolean;
+  };
 };
 
 type RoadmapUnit = {
@@ -78,6 +82,10 @@ type SessionOverview = {
     max?: number | null;
   };
   preceptorBriefing?: string | null;
+  requiresHpi?: boolean;
+  workflow?: {
+    requiresHpi?: boolean;
+  };
   linkedCase?: {
     caseId: string;
     title?: string | null;
@@ -319,7 +327,14 @@ export default function HomeScreen() {
   const meetPatient = () => {
     const caseId = selectedOverview?.linkedCase?.caseId || "uti_level1";
     setBriefingVisible(false);
-    router.push({ pathname: "/(tabs)/level1", params: { caseId } });
+    router.push({
+      pathname: "/(tabs)/level1",
+      params: {
+        caseId,
+        patientSessionSlug: selectedOverview?.slug || "first-patient",
+        requiresHpi: String(Boolean(selectedOverview?.workflow?.requiresHpi ?? selectedOverview?.requiresHpi)),
+      },
+    });
   };
 
   return (

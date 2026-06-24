@@ -45,7 +45,7 @@ async function resolveUser(req) {
 
 router.post("/", async (req, res, next) => {
   try {
-    const { caseId } = req.body || {};
+    const { caseId, patientSessionSlug } = req.body || {};
     if (!caseId) {
       res.status(400).json({ error: "caseId is required" });
       return;
@@ -69,6 +69,7 @@ router.post("/", async (req, res, next) => {
       userId: user.id,
       caseRecordId: caseRecord.id,
       conversationId: conversation.id,
+      patientSessionSlug,
     });
 
     res.json({ conversationId: conversation.id });
@@ -303,7 +304,7 @@ async function buildSavedSubmissionResponse(conversation, progressSummary) {
 
 router.post("/:id/submit", async (req, res, next) => {
   try {
-    const { hpi } = req.body || {};
+    const { hpi, patientSessionSlug } = req.body || {};
     if (hpi != null && typeof hpi !== "string") {
       res.status(400).json({ error: "hpi must be a string when provided" });
       return;
@@ -335,7 +336,10 @@ router.post("/:id/submit", async (req, res, next) => {
       return;
     }
 
-    const sessionAttempt = await getOrCreateSessionAttemptForConversation(conversation);
+    const sessionAttempt = await getOrCreateSessionAttemptForConversation(
+      conversation,
+      patientSessionSlug
+    );
 
     const caseId = conversation.patientCase.caseId;
     const [caseData, gradingData] = await Promise.all([

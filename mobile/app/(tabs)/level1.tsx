@@ -358,6 +358,20 @@ export default function Level1Screen() {
     const raw = params.caseId;
     return Array.isArray(raw) ? raw[0] : raw || "uti_level1";
   }, [params.caseId]);
+  const patientSessionSlug = useMemo(() => {
+    const raw = params.patientSessionSlug;
+    return Array.isArray(raw) ? raw[0] : raw || null;
+  }, [params.patientSessionSlug]);
+  const requiresHpi = useMemo(() => {
+    const raw = params.requiresHpi;
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (value == null) return true;
+    return String(value).toLowerCase() === "true";
+  }, [params.requiresHpi]);
+  const conversationStorageKey = useMemo(
+    () => `conv_${patientSessionSlug || caseId}`,
+    [caseId, patientSessionSlug]
+  );
   const patientImage = PATIENT_IMAGES[caseId] || PATIENT_IMAGES.uti_level1;
   const patientTalkingVideoLoop =
     PATIENT_TALKING_VIDEO_LOOPS[caseId] || PATIENT_TALKING_VIDEO_LOOPS.uti_level1;
@@ -762,7 +776,7 @@ const { sound } = await Audio.Sound.createAsync(
       const data = await request("/conversations", {
         method: "POST",
         headers: userHeaders,
-        body: { caseId },
+        body: { caseId, patientSessionSlug },
       });
       const id = String(data?.conversationId || "");
       if (!id) return null;
@@ -774,7 +788,7 @@ const { sound } = await Audio.Sound.createAsync(
     } finally {
       setCreatingConversation(false);
     }
-  }, [caseId, conversationId, creatingConversation, userHeaders]);
+  }, [caseId, conversationId, creatingConversation, patientSessionSlug, userHeaders]);
 
   useEffect(() => {
     setConversationId(null);
@@ -792,13 +806,13 @@ const { sound } = await Audio.Sound.createAsync(
     setSavedConversationId(null);
     setShowResumePrompt(false);
     setResumeCheckComplete(false);
-  }, [caseId]);
+  }, [conversationStorageKey]);
 
   // for resume chat button
   useEffect(() => {
     if (!conversationId) return;
-    setItemAsync(`conv_${caseId}`, conversationId).catch(() => {});
-  }, [conversationId, caseId]);
+    setItemAsync(conversationStorageKey, conversationId).catch(() => {});
+  }, [conversationId, conversationStorageKey]);
 
   // on mount, check if a previous conversation exists for this case
   useEffect(() => {
@@ -806,7 +820,7 @@ const { sound } = await Audio.Sound.createAsync(
 
     (async () => {
       try {
-        const saved = await getItemAsync(`conv_${caseId}`);
+        const saved = await getItemAsync(conversationStorageKey);
         if (cancelled) return;
 
         if (saved) {
@@ -826,7 +840,7 @@ const { sound } = await Audio.Sound.createAsync(
     return () => {
       cancelled = true;
     };
-  }, [caseId]);
+  }, [conversationStorageKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1011,18 +1025,9 @@ const { sound } = await Audio.Sound.createAsync(
     }
   };
 
-  const beginHpiStep = useCallback(() => {
-    if (messages.length === 0) {
-      setSubmitError("Complete at least one chat turn before finishing.");
-      return;
-    }
-    setSubmitError(null);
-    setStage("hpi");
-  }, [messages.length]);
-
   const submitForFinalGrade = useCallback(async () => {
     const hpi = hpiText.trim();
-    if (!hpi || submitting) return;
+    if ((requiresHpi && !hpi) || submitting) return;
 
     setSubmitError(null);
     setSubmitting(true);
@@ -1039,11 +1044,11 @@ const { sound } = await Audio.Sound.createAsync(
       const data = await request(`/conversations/${convoId}/submit`, {
         method: "POST",
         headers: userHeaders,
-        body: { hpi },
+        body: { hpi, patientSessionSlug },
       });
 
       setSubmissionResult(normalizeSubmissionPayload({ ...data, hpi }));
-      await deleteItemAsync(`conv_${caseId}`).catch(() => {});
+      await deleteItemAsync(conversationStorageKey).catch(() => {});
       setStage("results");
       setDebriefMessages([]);
       setDebriefInput("");
@@ -1091,10 +1096,32 @@ const { sound } = await Audio.Sound.createAsync(
     } finally {
       setSubmitting(false);
     }
-  }, [caseId, conversationId, ensureConversation, hpiText, submitting, userHeaders]);
+  }, [
+    conversationId,
+    conversationStorageKey,
+    ensureConversation,
+    hpiText,
+    patientSessionSlug,
+    requiresHpi,
+    submitting,
+    userHeaders,
+  ]);
 
   const submitDisabled =
-    submitting || creatingConversation || !conversationId || !hpiText.trim();
+    submitting || creatingConversation || !conversationId || (requiresHpi && !hpiText.trim());
+
+  const beginHpiStep = useCallback(() => {
+    if (messages.length === 0) {
+      setSubmitError("Complete at least one chat turn before finishing.");
+      return;
+    }
+    setSubmitError(null);
+    if (!requiresHpi) {
+      void submitForFinalGrade();
+      return;
+    }
+    setStage("hpi");
+  }, [messages.length, requiresHpi, submitForFinalGrade]);
 
   const visibleDebrief = useMemo(() => {
     if (!submissionResult) return null;
@@ -1186,23 +1213,23 @@ const { sound } = await Audio.Sound.createAsync(
       setShowResumePrompt(false);
     } catch (e: any) {
       console.warn("Failed to resume conversation:", e.message);
-      await deleteItemAsync(`conv_${caseId}`).catch(() => {});
+      await deleteItemAsync(conversationStorageKey).catch(() => {});
       setSavedConversationId(null);
       setShowResumePrompt(false);
     } finally {
       setResumeLoading(false);
     }
-  }, [caseId, savedConversationId, userHeaders]);
+  }, [conversationStorageKey, savedConversationId, userHeaders]);
 
   const startFresh = useCallback(async () => {
-    await deleteItemAsync(`conv_${caseId}`).catch(() => {});
+    await deleteItemAsync(conversationStorageKey).catch(() => {});
     setSavedConversationId(null);
     setShowResumePrompt(false);
-  }, [caseId]);
+  }, [conversationStorageKey]);
 
   const retryCase = useCallback(async () => {
     await stopSpeechPlayback();
-    await deleteItemAsync(`conv_${caseId}`).catch(() => {});
+    await deleteItemAsync(conversationStorageKey).catch(() => {});
 
     setSavedConversationId(null);
     setShowResumePrompt(false);
@@ -1220,7 +1247,7 @@ const { sound } = await Audio.Sound.createAsync(
     setDebriefSending(false);
     setDebriefError(null);
     setShowDetailedRubric(false);
-  }, [caseId, stopSpeechPlayback]);
+  }, [conversationStorageKey, stopSpeechPlayback]);
 
   if (loadingCase) {
     return (

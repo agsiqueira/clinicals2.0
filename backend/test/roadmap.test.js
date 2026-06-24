@@ -92,6 +92,8 @@ test("buildLearningPathRoadmap returns nested path data with user session status
   assert.equal(sessions[0].bestSessionScore, 100);
   assert.equal(sessions[1].status, "available");
   assert.equal(sessions[2].status, "locked");
+  assert.equal(sessions[0].requiresHpi, false);
+  assert.equal(sessions[0].workflow.requiresHpi, false);
   assert.deepEqual(sessions[0].badgeThresholds, { gold: 84, silver: 50, bronze: 1 });
   assert.equal(sessions[0].achievements[0].slug, "formal-introduction");
 });
@@ -124,4 +126,6 @@ test("buildSessionOverview returns First Patient overview and preceptor briefing
   assert.match(overview.preceptorBriefing, /Dr\. Martinez/);
   assert.match(overview.preceptorBriefing, /Formal Introduction/);
   assert.equal(overview.badgeThresholds.gold, 84);
+  assert.equal(overview.requiresHpi, false);
+  assert.equal(overview.workflow.requiresHpi, false);
 });

@@ -5,11 +5,17 @@ const {
   determineBadgeTier,
 } = require("../utils/achievementScoring");
 
-async function findFirstPatientSession(caseRecordId) {
-  return prisma.patientSession.findFirst({
+async function resolvePatientSessionForAttempt({
+  caseRecordId,
+  patientSessionSlug,
+  client = prisma,
+}) {
+  const slug = patientSessionSlug || "first-patient";
+
+  return client.patientSession.findFirst({
     where: {
       caseId: caseRecordId,
-      slug: "first-patient",
+      slug,
       active: true,
     },
     include: {
@@ -21,8 +27,16 @@ async function findFirstPatientSession(caseRecordId) {
   });
 }
 
-async function createSessionAttemptForConversation({ userId, caseRecordId, conversationId }) {
-  const patientSession = await findFirstPatientSession(caseRecordId);
+async function createSessionAttemptForConversation({
+  userId,
+  caseRecordId,
+  conversationId,
+  patientSessionSlug,
+}) {
+  const patientSession = await resolvePatientSessionForAttempt({
+    caseRecordId,
+    patientSessionSlug,
+  });
   if (!patientSession) return null;
 
   return prisma.sessionAttempt.upsert({
@@ -40,7 +54,7 @@ async function createSessionAttemptForConversation({ userId, caseRecordId, conve
   });
 }
 
-async function getOrCreateSessionAttemptForConversation(conversation) {
+async function getOrCreateSessionAttemptForConversation(conversation, patientSessionSlug) {
   if (!conversation) return null;
 
   const existing = await prisma.sessionAttempt.findUnique({
@@ -52,6 +66,7 @@ async function getOrCreateSessionAttemptForConversation(conversation) {
     userId: conversation.userId,
     caseRecordId: conversation.caseId,
     conversationId: conversation.id,
+    patientSessionSlug,
   });
 }
 
@@ -337,4 +352,5 @@ module.exports = {
   finalizeSessionAttemptFromSubmission,
   getSessionDebriefForAttempt,
   getOrCreateSessionAttemptForConversation,
+  resolvePatientSessionForAttempt,
 };

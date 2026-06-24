@@ -12,7 +12,10 @@ const {
   computeSessionScore,
   determineBadgeTier,
 } = require("../src/utils/achievementScoring");
-const { buildSessionDebriefPayload } = require("../src/services/sessionAttempts");
+const {
+  buildSessionDebriefPayload,
+  resolvePatientSessionForAttempt,
+} = require("../src/services/sessionAttempts");
 
 const FIXTURES_DIR = path.resolve(__dirname, "../scripts/fixtures");
 
@@ -208,4 +211,29 @@ test("buildSessionDebriefPayload derives greeting focus from weakest achievement
     bronzeDebrief.greeting,
     "Thanks for completing the session. As you review your report, pay particular attention to Chief Complaint. When you're ready, I'd be happy to discuss what happened and how to improve next time."
   );
+});
+
+test("resolvePatientSessionForAttempt uses patientSessionSlug with case id", async () => {
+  const calls = [];
+  const fakeClient = {
+    patientSession: {
+      findFirst: async (query) => {
+        calls.push(query);
+        return { id: "session-2", slug: query.where.slug };
+      },
+    },
+  };
+
+  const session = await resolvePatientSessionForAttempt({
+    caseRecordId: "case-db-id",
+    patientSessionSlug: "first-patient-hpi",
+    client: fakeClient,
+  });
+
+  assert.equal(session.slug, "first-patient-hpi");
+  assert.deepEqual(calls[0].where, {
+    caseId: "case-db-id",
+    slug: "first-patient-hpi",
+    active: true,
+  });
 });

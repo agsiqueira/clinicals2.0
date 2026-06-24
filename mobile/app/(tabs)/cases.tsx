@@ -15,12 +15,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../../src/api/client";
 import { casesStyles } from "../../assets/styles/cases.styles";
 
-type CaseItem = {
-  caseId: string;
-  title: string;
-  level?: number;
-};
-
 type AchievementSummary = {
   id: string;
   slug: string;
@@ -138,12 +132,9 @@ export default function HomeScreen() {
   const { user, isLoaded: userLoaded } = useUser();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
-  const [loadingCases, setLoadingCases] = useState(true);
   const [loadingProgress, setLoadingProgress] = useState(true);
   const [loadingRoadmap, setLoadingRoadmap] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [roadmapError, setRoadmapError] = useState<string | null>(null);
-  const [cases, setCases] = useState<CaseItem[]>([]);
   const [learningPaths, setLearningPaths] = useState<LearningPath[]>([]);
   const [points, setPoints] = useState(0);
   const [level, setLevel] = useState(1);
@@ -180,19 +171,6 @@ export default function HomeScreen() {
 
     return info.charAt(0).toUpperCase() + info.slice(1);
   }, [user]);
-
-  const loadCases = useCallback(async () => {
-    try {
-      setError(null);
-      setLoadingCases(true);
-      const data = await api.getCases();
-      setCases(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load cases.");
-    } finally {
-      setLoadingCases(false);
-    }
-  }, []);
 
   const loadRoadmap = useCallback(async () => {
     if (!userLoaded) {
@@ -244,9 +222,8 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadCases();
       loadProgress();
-    }, [loadCases, loadProgress])
+    }, [loadProgress])
   );
 
   useEffect(() => {
@@ -334,43 +311,6 @@ export default function HomeScreen() {
     const caseId = selectedOverview?.linkedCase?.caseId || "uti_level1";
     setBriefingVisible(false);
     router.push({ pathname: "/(tabs)/level1", params: { caseId } });
-  };
-
-  const renderLegacyCase = (item: CaseItem) => {
-    const levelLabel = Math.max(1, Number(item.level ?? 1) || 1);
-    return (
-      <View key={item.caseId} style={casesStyles.caseCard}>
-        <Pressable
-          onPress={() => router.push({ pathname: "/(tabs)/level1", params: { caseId: item.caseId } })}
-          style={({ pressed }) => [
-            casesStyles.caseCardPressable,
-            pressed && casesStyles.caseCardPressablePressed,
-          ]}
-        >
-          <View style={casesStyles.caseCardHeaderRow}>
-            <View style={casesStyles.caseCardHeaderText}>
-              <Text style={casesStyles.caseCardLevelLabel}>Level {levelLabel}</Text>
-              <Text style={casesStyles.caseCardTitle}>{item.title || `Level ${levelLabel}.1`}</Text>
-              <Text style={casesStyles.caseCardHintText}>Tap here to start the patient interview.</Text>
-            </View>
-            <View style={casesStyles.caseCardLaunchPill}>
-              <Text style={casesStyles.caseCardLaunchPillText}>Start</Text>
-            </View>
-          </View>
-        </Pressable>
-        <View style={casesStyles.attemptsRow}>
-          <Pressable
-            onPress={() => router.push({ pathname: "/attempts", params: { caseId: item.caseId } })}
-            style={({ pressed }) => [
-              casesStyles.attemptsButton,
-              { backgroundColor: pressed ? "#f3f4f6" : "#f9fafb" },
-            ]}
-          >
-            <Text style={casesStyles.attemptsButtonText}>Previous Attempts</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
   };
 
   return (
@@ -482,27 +422,6 @@ export default function HomeScreen() {
           ))
         )}
 
-        <View style={casesStyles.sectionHeader}>
-          <Text style={casesStyles.legacyTitle}>Legacy Case Flow</Text>
-          <Text style={casesStyles.casesSubText}>The original case list remains available.</Text>
-        </View>
-
-        {loadingCases ? (
-          <View style={casesStyles.loadingBlock}>
-            <ActivityIndicator />
-          </View>
-        ) : error ? (
-          <View style={casesStyles.inlineErrorBox}>
-            <Text style={casesStyles.errorText}>{error}</Text>
-            <Pressable onPress={loadCases} style={casesStyles.retryButton}>
-              <Text style={casesStyles.retryButtonText}>Retry</Text>
-            </Pressable>
-          </View>
-        ) : cases.length === 0 ? (
-          <Text style={casesStyles.emptyText}>No cases found.</Text>
-        ) : (
-          <View style={casesStyles.legacyList}>{cases.map(renderLegacyCase)}</View>
-        )}
       </ScrollView>
 
       <Modal
@@ -567,19 +486,12 @@ export default function HomeScreen() {
                   Estimated time: {selectedOverview.estimatedTime.min || 3}-{selectedOverview.estimatedTime.max || 5} minutes
                 </Text>
 
-                {!!selectedOverview.preceptorBriefing && (
-                  <View style={casesStyles.briefingBox}>
-                    <Text style={casesStyles.briefingLabel}>Preceptor Briefing</Text>
-                    <Text style={casesStyles.briefingText}>{selectedOverview.preceptorBriefing}</Text>
-                  </View>
-                )}
-
                 <View style={casesStyles.modalActions}>
                   <Pressable onPress={() => setOverviewVisible(false)} style={casesStyles.modalSecondaryButton}>
                     <Text style={casesStyles.modalSecondaryButtonText}>Close</Text>
                   </Pressable>
                   <Pressable onPress={startSelectedSession} style={casesStyles.modalPrimaryButton}>
-                    <Text style={casesStyles.modalPrimaryButtonText}>Start Session</Text>
+                    <Text style={casesStyles.modalPrimaryButtonText}>Meet Preceptor</Text>
                   </Pressable>
                 </View>
               </ScrollView>

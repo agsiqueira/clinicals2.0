@@ -96,6 +96,15 @@ type PreceptorChatMessage = {
   content: string;
 };
 
+const INITIAL_PRECEPTOR_BRIEFING =
+  "Welcome. I'm Dr. Martinez. In this session, you'll meet your first patient and begin the clinical encounter. Focus on two goals: introduce yourself professionally and identify the patient's chief complaint. Ask me any questions before you meet the patient.";
+
+const PRECEPTOR_QUICK_ACTIONS = [
+  "How should I introduce myself?",
+  "What is a chief complaint?",
+  "What should I focus on?",
+];
+
 function normalizeLearningPathsResponse(data: any): LearningPath[] {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.learningPaths)) return data.learningPaths;
@@ -261,14 +270,14 @@ export default function HomeScreen() {
 
   const startSelectedSession = () => {
     setOverviewVisible(false);
-    setPreceptorMessages([]);
+    setPreceptorMessages([{ role: "assistant", content: INITIAL_PRECEPTOR_BRIEFING }]);
     setPreceptorInput("");
     setPreceptorError(null);
     setBriefingVisible(true);
   };
 
-  const sendPreceptorMessage = async () => {
-    const text = preceptorInput.trim();
+  const sendPreceptorMessage = async (messageOverride?: string) => {
+    const text = (typeof messageOverride === "string" ? messageOverride : preceptorInput).trim();
     if (!text || !selectedOverview || preceptorSending) return;
 
     const nextMessages: PreceptorChatMessage[] = [
@@ -547,16 +556,8 @@ export default function HomeScreen() {
                   ))}
                 </View>
 
-                <View style={casesStyles.briefingBox}>
-                  <Text style={casesStyles.briefingLabel}>Briefing</Text>
-                  <Text style={casesStyles.briefingText}>
-                    {selectedOverview.preceptorBriefing ||
-                      "You are ready to begin. Focus on a professional opening, listen carefully, and take the encounter one step at a time."}
-                  </Text>
-                </View>
-
                 <View style={casesStyles.preceptorChatBox}>
-                  <Text style={casesStyles.modalSectionTitle}>Ask Dr. Martinez</Text>
+                  <Text style={casesStyles.modalSectionTitle}>Dr. Martinez says:</Text>
                   <View style={casesStyles.preceptorChatMessages}>
                     {preceptorMessages.length === 0 ? (
                       <Text style={casesStyles.preceptorChatEmpty}>
@@ -564,19 +565,37 @@ export default function HomeScreen() {
                       </Text>
                     ) : (
                       preceptorMessages.map((message, index) => (
-                        <View
-                          key={`${message.role}-${index}`}
-                          style={[
-                            casesStyles.preceptorChatBubble,
-                            message.role === "user"
-                              ? casesStyles.preceptorChatBubbleUser
-                              : casesStyles.preceptorChatBubbleAssistant,
-                          ]}
-                        >
-                          <Text style={casesStyles.preceptorChatRole}>
-                            {message.role === "user" ? "You" : "Dr. Martinez"}
-                          </Text>
-                          <Text style={casesStyles.preceptorChatText}>{message.content}</Text>
+                        <View key={`${message.role}-${index}`} style={casesStyles.preceptorChatMessageGroup}>
+                          <View
+                            style={[
+                              casesStyles.preceptorChatBubble,
+                              message.role === "user"
+                                ? casesStyles.preceptorChatBubbleUser
+                                : casesStyles.preceptorChatBubbleAssistant,
+                            ]}
+                          >
+                            <Text style={casesStyles.preceptorChatRole}>
+                              {message.role === "user" ? "You" : "Dr. Martinez"}
+                            </Text>
+                            <Text style={casesStyles.preceptorChatText}>{message.content}</Text>
+                          </View>
+                          {index === 0 && message.role === "assistant" ? (
+                            <View style={casesStyles.preceptorQuickActions}>
+                              {PRECEPTOR_QUICK_ACTIONS.map((action) => (
+                                <Pressable
+                                  key={action}
+                                  onPress={() => sendPreceptorMessage(action)}
+                                  disabled={preceptorSending}
+                                  style={({ pressed }) => [
+                                    casesStyles.preceptorQuickActionButton,
+                                    { opacity: preceptorSending ? 0.45 : pressed ? 0.75 : 1 },
+                                  ]}
+                                >
+                                  <Text style={casesStyles.preceptorQuickActionText}>{action}</Text>
+                                </Pressable>
+                              ))}
+                            </View>
+                          ) : null}
                         </View>
                       ))
                     )}
@@ -595,7 +614,7 @@ export default function HomeScreen() {
                       placeholder="Ask a question before meeting the patient..."
                       style={casesStyles.preceptorChatInput}
                       returnKeyType="send"
-                      onSubmitEditing={sendPreceptorMessage}
+                      onSubmitEditing={() => sendPreceptorMessage()}
                     />
                     <Pressable
                       onPress={sendPreceptorMessage}

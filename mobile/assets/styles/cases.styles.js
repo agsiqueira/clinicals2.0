@@ -96,12 +96,6 @@ export const casesStyles = StyleSheet.create({
   casesSubText: {
     color: "#6b7280",
   },
-  legacyTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#111827",
-    marginBottom: 4,
-  },
   loadingBlock: {
     minHeight: 120,
     justifyContent: "center",
@@ -243,10 +237,6 @@ export const casesStyles = StyleSheet.create({
     color: "#6b7280",
     fontWeight: "700",
   },
-  legacyList: {
-    gap: 12,
-  },
-
   // Error state
   errorText: {
     color: "#b91c1c",
@@ -263,76 +253,6 @@ export const casesStyles = StyleSheet.create({
   retryButtonText: {
     fontWeight: "600",
   },
-
-  // Case card
-  caseCard: {
-    borderWidth: 1,
-    borderColor: "#ddd6fe",
-    borderRadius: 12,
-    backgroundColor: "#ffffff",
-    overflow: "hidden",
-  },
-  caseCardPressable: {
-    padding: 14,
-    backgroundColor: "#faf5ff",
-  },
-  caseCardPressablePressed: {
-    backgroundColor: "#f3e8ff",
-  },
-  caseCardHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  caseCardHeaderText: {
-    flex: 1,
-  },
-  caseCardLevelLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6d28d9",
-    letterSpacing: 0.3,
-    marginBottom: 6,
-    textTransform: "uppercase",
-  },
-  caseCardTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#111827",
-  },
-  caseCardHintText: {
-    color: "#6b7280",
-    marginTop: 4,
-    fontSize: 13,
-  },
-  caseCardLaunchPill: {
-    borderRadius: 999,
-    backgroundColor: "#6d28d9",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    minWidth: 74,
-    alignItems: "center",
-  },
-  caseCardLaunchPillText: {
-    color: "#ffffff",
-    fontWeight: "700",
-  },
-  attemptsRow: {
-    borderTopWidth: 1,
-    borderColor: "#ede9fe",
-    backgroundColor: "#fcfcff",
-  },
-  attemptsButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  attemptsButtonText: {
-    fontWeight: "600",
-    color: "#6b7280",
-    fontSize: 14,
-  },
-
   // Empty state
   emptyText: {
     color: "#6b7280",
@@ -476,24 +396,6 @@ export const casesStyles = StyleSheet.create({
     color: "#4b5563",
     fontWeight: "700",
   },
-  briefingBox: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#c7d2fe",
-    backgroundColor: "#eef2ff",
-    padding: 12,
-    gap: 6,
-  },
-  briefingLabel: {
-    fontSize: 12,
-    fontWeight: "800",
-    color: "#3730a3",
-    textTransform: "uppercase",
-  },
-  briefingText: {
-    color: "#1f2937",
-    lineHeight: 20,
-  },
   preceptorChatBox: {
     borderWidth: 1,
     borderColor: "#e5e7eb",
@@ -502,6 +404,9 @@ export const casesStyles = StyleSheet.create({
     gap: 10,
   },
   preceptorChatMessages: {
+    gap: 8,
+  },
+  preceptorChatMessageGroup: {
     gap: 8,
   },
   preceptorChatEmpty: {
@@ -537,6 +442,24 @@ export const casesStyles = StyleSheet.create({
   preceptorChatText: {
     color: "#1f2937",
     lineHeight: 18,
+  },
+  preceptorQuickActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  preceptorQuickActionButton: {
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    borderRadius: 8,
+    backgroundColor: "#faf5ff",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  preceptorQuickActionText: {
+    color: "#5b21b6",
+    fontSize: 12,
+    fontWeight: "800",
   },
   preceptorChatInputRow: {
     flexDirection: "row",

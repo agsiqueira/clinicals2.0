@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
-import { useUser } from "@clerk/clerk-expo";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Audio } from "expo-av";
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as FileSystem from "expo-file-system/legacy";
@@ -476,17 +476,21 @@ export default function Level1Screen() {
     }
   };
 
+  const { userId: authUserId } = useAuth();
   const { user } = useUser();
 
   const userHeaders = useMemo(() => {
     const headers: Record<string, string> = {};
-    if (user?.id) headers["x-clerk-user-id"] = user.id;
-    if (user?.fullName) headers["x-user-name"] = user.fullName;
     const email = user?.primaryEmailAddress?.emailAddress;
+    const fallbackEmail = email || user?.emailAddresses?.[0]?.emailAddress;
+    const resolvedUserId = user?.id || authUserId || (__DEV__ ? fallbackEmail || "dev-user" : undefined);
+
+    if (resolvedUserId) headers["x-clerk-user-id"] = resolvedUserId;
+    if (user?.fullName) headers["x-user-name"] = user.fullName;
     if (email) headers["x-user-email"] = email;
     if (user?.imageUrl) headers["x-user-image"] = user.imageUrl;
     return headers;
-  }, [user]);
+  }, [authUserId, user]);
 
   const stopSpeechPlayback = useCallback(async () => {
     const currentSound = soundRef.current;
@@ -942,6 +946,9 @@ const { sound } = await Audio.Sound.createAsync(
     }
   }, [caseId, conversationId, ensureConversation, hpiText, submitting, userHeaders]);
 
+  const submitDisabled =
+    submitting || creatingConversation || !conversationId || !hpiText.trim();
+
   const resumeConversation = useCallback(async () => {
     if (!savedConversationId) return;
     setResumeLoading(true);
@@ -1357,6 +1364,12 @@ const { sound } = await Audio.Sound.createAsync(
                   <Text style={caseStyles.errorText}>{submitError}</Text>
                 ) : null}
 
+                {!conversationId && !submitError ? (
+                  <Text style={caseStyles.resultsRetryNote}>
+                    Preparing this attempt. Submit will be available in a moment.
+                  </Text>
+                ) : null}
+
                 <View style={caseStyles.hpiButtonRow}>
                   <Pressable
                     onPress={() => setStage("chat")}
@@ -1370,14 +1383,14 @@ const { sound } = await Audio.Sound.createAsync(
                   </Pressable>
                   <Pressable
                     onPress={submitForFinalGrade}
-                    disabled={submitting || !hpiText.trim()}
+                    disabled={submitDisabled}
                     style={({ pressed }) => ({
                       ...caseStyles.outlineButton,
-                      opacity: submitting || !hpiText.trim() ? 0.5 : pressed ? 0.7 : 1,
+                      opacity: submitDisabled ? 0.5 : pressed ? 0.7 : 1,
                     })}
                   >
                     <Text style={caseStyles.outlineButtonText}>
-                      {submitting ? "Submitting..." : "Submit Case"}
+                      {submitting ? "Submitting..." : creatingConversation || !conversationId ? "Preparing..." : "Submit Case"}
                     </Text>
                   </Pressable>
                 </View>

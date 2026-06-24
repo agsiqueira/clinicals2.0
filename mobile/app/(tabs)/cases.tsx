@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useClerk, useUser } from "@clerk/clerk-expo";
+import { useAuth, useClerk, useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../../src/api/client";
@@ -91,6 +91,13 @@ type SessionOverview = {
   } | null;
 };
 
+function normalizeLearningPathsResponse(data: any): LearningPath[] {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.learningPaths)) return data.learningPaths;
+  if (data && typeof data === "object" && Array.isArray(data.units)) return [data];
+  return [];
+}
+
 function badgeLabel(session: RoadmapSession) {
   if (session.status !== "completed") return null;
   if (!session.badgeTier || session.badgeTier === "NONE") return "Completed";
@@ -116,7 +123,8 @@ function nodeTextStyleFor(session: RoadmapSession) {
 
 export default function HomeScreen() {
   const { signOut } = useClerk();
-  const { user } = useUser();
+  const { userId: authUserId } = useAuth();
+  const { user, isLoaded: userLoaded } = useUser();
   const router = useRouter();
   const [signingOut, setSigningOut] = useState(false);
   const [loadingCases, setLoadingCases] = useState(true);
@@ -135,13 +143,16 @@ export default function HomeScreen() {
 
   const userHeaders = useMemo(() => {
     const headers: Record<string, string> = {};
-    if (user?.id) headers["x-clerk-user-id"] = user.id;
-    if (user?.fullName) headers["x-user-name"] = user.fullName;
     const email = user?.primaryEmailAddress?.emailAddress;
+    const fallbackEmail = email || user?.emailAddresses?.[0]?.emailAddress;
+    const resolvedUserId = user?.id || authUserId || (__DEV__ ? fallbackEmail || "dev-user" : undefined);
+
+    if (resolvedUserId) headers["x-clerk-user-id"] = resolvedUserId;
+    if (user?.fullName) headers["x-user-name"] = user.fullName;
     if (email) headers["x-user-email"] = email;
     if (user?.imageUrl) headers["x-user-image"] = user.imageUrl;
     return headers;
-  }, [user]);
+  }, [authUserId, user]);
 
   const displayName = useMemo(() => {
     const info =
@@ -168,6 +179,11 @@ export default function HomeScreen() {
   }, []);
 
   const loadRoadmap = useCallback(async () => {
+    if (!userLoaded) {
+      setLoadingRoadmap(true);
+      return;
+    }
+
     if (!userHeaders["x-clerk-user-id"]) {
       setLearningPaths([]);
       setLoadingRoadmap(false);
@@ -178,14 +194,15 @@ export default function HomeScreen() {
       setRoadmapError(null);
       setLoadingRoadmap(true);
       const data = await api.getLearningPaths(userHeaders);
-      setLearningPaths(Array.isArray(data) ? data : []);
+      const parsed = normalizeLearningPathsResponse(data);
+      setLearningPaths(parsed);
     } catch (err: any) {
       setRoadmapError(err?.message || "Failed to load learning roadmap.");
       setLearningPaths([]);
     } finally {
       setLoadingRoadmap(false);
     }
-  }, [userHeaders]);
+  }, [userHeaders, userLoaded]);
 
   const loadProgress = useCallback(async () => {
     if (!userHeaders["x-clerk-user-id"]) {
@@ -213,9 +230,12 @@ export default function HomeScreen() {
     useCallback(() => {
       loadCases();
       loadProgress();
-      loadRoadmap();
-    }, [loadCases, loadProgress, loadRoadmap])
+    }, [loadCases, loadProgress])
   );
+
+  useEffect(() => {
+    loadRoadmap();
+  }, [loadRoadmap]);
 
   const handleSignOut = async () => {
     if (signingOut) return;

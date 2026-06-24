@@ -360,6 +360,37 @@ export const casesStyles = StyleSheet.create({
     padding: 18,
     gap: 12,
   },
+  preceptorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  preceptorAvatarCircle: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: "#6d28d9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  preceptorAvatarText: {
+    color: "#ffffff",
+    fontSize: 17,
+    fontWeight: "800",
+  },
+  preceptorHeaderText: {
+    flex: 1,
+  },
+  preceptorName: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#111827",
+  },
+  preceptorSpecialty: {
+    marginTop: 2,
+    color: "#6b7280",
+    fontWeight: "600",
+  },
   modalTitle: {
     fontSize: 22,
     fontWeight: "800",
@@ -462,6 +493,78 @@ export const casesStyles = StyleSheet.create({
   briefingText: {
     color: "#1f2937",
     lineHeight: 20,
+  },
+  preceptorChatBox: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    padding: 12,
+    gap: 10,
+  },
+  preceptorChatMessages: {
+    gap: 8,
+  },
+  preceptorChatEmpty: {
+    color: "#6b7280",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  preceptorChatBubble: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 3,
+  },
+  preceptorChatBubbleUser: {
+    backgroundColor: "#faf5ff",
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    alignSelf: "flex-end",
+    maxWidth: "88%",
+  },
+  preceptorChatBubbleAssistant: {
+    backgroundColor: "#eef2ff",
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
+    alignSelf: "flex-start",
+    maxWidth: "92%",
+  },
+  preceptorChatRole: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#6d28d9",
+  },
+  preceptorChatText: {
+    color: "#1f2937",
+    lineHeight: 18,
+  },
+  preceptorChatInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  preceptorChatInput: {
+    flex: 1,
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: "#ffffff",
+  },
+  preceptorChatSendButton: {
+    minHeight: 42,
+    minWidth: 58,
+    borderRadius: 8,
+    backgroundColor: "#6d28d9",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  preceptorChatSendText: {
+    color: "#ffffff",
+    fontWeight: "800",
   },
   modalActions: {
     flexDirection: "row",

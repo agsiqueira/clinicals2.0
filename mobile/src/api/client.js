@@ -104,6 +104,12 @@ export const api = {
   getLearningPaths: (headers) => request("/learning-paths", { headers }),
   getPatientSessionOverview: (slug, headers) =>
     request(`/learning-paths/patient-sessions/${slug}`, { headers }),
+  sendPreceptorChatMessage: (slug, payload, headers) =>
+    request(`/learning-paths/patient-sessions/${slug}/preceptor-chat`, {
+      method: "POST",
+      body: payload,
+      headers,
+    }),
 
   // ---- Example resource calls (edit paths to match your backend)
   getCases: () => request("/cases"),

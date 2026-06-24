@@ -5,6 +5,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -89,6 +90,16 @@ type SessionOverview = {
     level?: number | null;
     setting?: string | null;
   } | null;
+  preceptorPersona?: {
+    name?: string | null;
+    specialty?: string | null;
+    avatarUrl?: string | null;
+  } | null;
+};
+
+type PreceptorChatMessage = {
+  role: "user" | "assistant";
+  content: string;
 };
 
 function normalizeLearningPathsResponse(data: any): LearningPath[] {
@@ -140,6 +151,11 @@ export default function HomeScreen() {
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [overviewVisible, setOverviewVisible] = useState(false);
+  const [briefingVisible, setBriefingVisible] = useState(false);
+  const [preceptorMessages, setPreceptorMessages] = useState<PreceptorChatMessage[]>([]);
+  const [preceptorInput, setPreceptorInput] = useState("");
+  const [preceptorSending, setPreceptorSending] = useState(false);
+  const [preceptorError, setPreceptorError] = useState<string | null>(null);
 
   const userHeaders = useMemo(() => {
     const headers: Record<string, string> = {};
@@ -267,8 +283,56 @@ export default function HomeScreen() {
   };
 
   const startSelectedSession = () => {
-    const caseId = selectedOverview?.linkedCase?.caseId || "uti_level1";
     setOverviewVisible(false);
+    setPreceptorMessages([]);
+    setPreceptorInput("");
+    setPreceptorError(null);
+    setBriefingVisible(true);
+  };
+
+  const sendPreceptorMessage = async () => {
+    const text = preceptorInput.trim();
+    if (!text || !selectedOverview || preceptorSending) return;
+
+    const nextMessages: PreceptorChatMessage[] = [
+      ...preceptorMessages,
+      { role: "user", content: text },
+    ];
+
+    setPreceptorMessages(nextMessages);
+    setPreceptorInput("");
+    setPreceptorError(null);
+    setPreceptorSending(true);
+
+    try {
+      const data = await api.sendPreceptorChatMessage(
+        selectedOverview.slug,
+        {
+          message: text,
+          messages: preceptorMessages,
+        },
+        userHeaders
+      );
+      const reply = String(data?.reply || "").trim();
+      setPreceptorMessages((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content:
+            reply ||
+            "Focus on greeting the patient professionally and inviting them to share their main concern.",
+        },
+      ]);
+    } catch (err: any) {
+      setPreceptorError(err?.message || "Dr. Martinez could not respond right now.");
+    } finally {
+      setPreceptorSending(false);
+    }
+  };
+
+  const meetPatient = () => {
+    const caseId = selectedOverview?.linkedCase?.caseId || "uti_level1";
+    setBriefingVisible(false);
     router.push({ pathname: "/(tabs)/level1", params: { caseId } });
   };
 
@@ -516,6 +580,135 @@ export default function HomeScreen() {
                   </Pressable>
                   <Pressable onPress={startSelectedSession} style={casesStyles.modalPrimaryButton}>
                     <Text style={casesStyles.modalPrimaryButtonText}>Start Session</Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={briefingVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setBriefingVisible(false)}
+      >
+        <View style={casesStyles.modalBackdrop}>
+          <View style={casesStyles.sessionModal}>
+            {selectedOverview ? (
+              <ScrollView contentContainerStyle={casesStyles.modalContent}>
+                <View style={casesStyles.preceptorHeader}>
+                  <View style={casesStyles.preceptorAvatarCircle}>
+                    <Text style={casesStyles.preceptorAvatarText}>
+                      {(selectedOverview.preceptorPersona?.name || "Dr. Martinez")
+                        .split(" ")
+                        .map((part) => part.charAt(0))
+                        .join("")
+                        .slice(0, 2)}
+                    </Text>
+                  </View>
+                  <View style={casesStyles.preceptorHeaderText}>
+                    <Text style={casesStyles.preceptorName}>
+                      {selectedOverview.preceptorPersona?.name || "Dr. Martinez"}
+                    </Text>
+                    <Text style={casesStyles.preceptorSpecialty}>
+                      {selectedOverview.preceptorPersona?.specialty || "Clinical Preceptor"}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={casesStyles.modalTitle}>{selectedOverview.title}</Text>
+                {!!selectedOverview.objective && (
+                  <Text style={casesStyles.modalObjective}>{selectedOverview.objective}</Text>
+                )}
+
+                <View style={casesStyles.modalSection}>
+                  <Text style={casesStyles.modalSectionTitle}>Main Achievements</Text>
+                  {selectedOverview.achievements.map((achievement) => (
+                    <View key={achievement.id} style={casesStyles.achievementRow}>
+                      <Text style={casesStyles.achievementTitle}>{achievement.title}</Text>
+                      {achievement.weightPercent != null && (
+                        <Text style={casesStyles.achievementWeight}>{achievement.weightPercent}%</Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+
+                <View style={casesStyles.briefingBox}>
+                  <Text style={casesStyles.briefingLabel}>Briefing</Text>
+                  <Text style={casesStyles.briefingText}>
+                    {selectedOverview.preceptorBriefing ||
+                      "You are ready to begin. Focus on a professional opening, listen carefully, and take the encounter one step at a time."}
+                  </Text>
+                </View>
+
+                <View style={casesStyles.preceptorChatBox}>
+                  <Text style={casesStyles.modalSectionTitle}>Ask Dr. Martinez</Text>
+                  <View style={casesStyles.preceptorChatMessages}>
+                    {preceptorMessages.length === 0 ? (
+                      <Text style={casesStyles.preceptorChatEmpty}>
+                        Ask about the session goals, introductions, or eliciting the chief complaint.
+                      </Text>
+                    ) : (
+                      preceptorMessages.map((message, index) => (
+                        <View
+                          key={`${message.role}-${index}`}
+                          style={[
+                            casesStyles.preceptorChatBubble,
+                            message.role === "user"
+                              ? casesStyles.preceptorChatBubbleUser
+                              : casesStyles.preceptorChatBubbleAssistant,
+                          ]}
+                        >
+                          <Text style={casesStyles.preceptorChatRole}>
+                            {message.role === "user" ? "You" : "Dr. Martinez"}
+                          </Text>
+                          <Text style={casesStyles.preceptorChatText}>{message.content}</Text>
+                        </View>
+                      ))
+                    )}
+                    {preceptorSending ? (
+                      <Text style={casesStyles.preceptorChatEmpty}>Dr. Martinez is responding...</Text>
+                    ) : null}
+                  </View>
+                  {preceptorError ? (
+                    <Text style={casesStyles.errorText}>{preceptorError}</Text>
+                  ) : null}
+                  <View style={casesStyles.preceptorChatInputRow}>
+                    <TextInput
+                      value={preceptorInput}
+                      onChangeText={setPreceptorInput}
+                      editable={!preceptorSending}
+                      placeholder="Ask a question before meeting the patient..."
+                      style={casesStyles.preceptorChatInput}
+                      returnKeyType="send"
+                      onSubmitEditing={sendPreceptorMessage}
+                    />
+                    <Pressable
+                      onPress={sendPreceptorMessage}
+                      disabled={preceptorSending || !preceptorInput.trim()}
+                      style={({ pressed }) => [
+                        casesStyles.preceptorChatSendButton,
+                        {
+                          opacity:
+                            preceptorSending || !preceptorInput.trim() ? 0.45 : pressed ? 0.75 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={casesStyles.preceptorChatSendText}>
+                        {preceptorSending ? "..." : "Ask"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+
+                <View style={casesStyles.modalActions}>
+                  <Pressable onPress={() => setBriefingVisible(false)} style={casesStyles.modalSecondaryButton}>
+                    <Text style={casesStyles.modalSecondaryButtonText}>Back</Text>
+                  </Pressable>
+                  <Pressable onPress={meetPatient} style={casesStyles.modalPrimaryButton}>
+                    <Text style={casesStyles.modalPrimaryButtonText}>Meet Patient</Text>
                   </Pressable>
                 </View>
               </ScrollView>

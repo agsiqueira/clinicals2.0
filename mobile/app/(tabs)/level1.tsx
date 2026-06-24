@@ -1145,7 +1145,8 @@ const { sound } = await Audio.Sound.createAsync(
     ];
   }, [submissionResult, visibleDebrief]);
 
-  const reviewBadgeLabel = visibleDebrief?.badgeLabel || badgeLabelFromTier(badgeTierFromScore(submissionResult?.score || 0));
+  const reviewSessionScore = visibleDebrief?.sessionScore ?? submissionResult?.score ?? 0;
+  const reviewBadgeLabel = visibleDebrief?.badgeLabel || badgeLabelFromTier(badgeTierFromScore(reviewSessionScore));
   const reviewSubmittedAt = formatResultDate(submissionResult?.submittedAt);
 
   const sendDebriefMessage = useCallback(
@@ -1560,7 +1561,7 @@ const { sound } = await Audio.Sound.createAsync(
                     </View>
                     <View style={caseStyles.resultsSummaryItem}>
                       <Text style={caseStyles.resultsSummaryLabel}>Score</Text>
-                      <Text style={caseStyles.resultsSummaryValue}>{submissionResult.score}%</Text>
+                      <Text style={caseStyles.resultsSummaryValue}>{reviewSessionScore}%</Text>
                     </View>
                     <View style={caseStyles.resultsSummaryItem}>
                       <Text style={caseStyles.resultsSummaryLabel}>Badge</Text>

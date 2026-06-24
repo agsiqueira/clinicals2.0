@@ -539,23 +539,6 @@ export default function HomeScreen() {
                   </View>
                 </View>
 
-                <Text style={casesStyles.modalTitle}>{selectedOverview.title}</Text>
-                {!!selectedOverview.objective && (
-                  <Text style={casesStyles.modalObjective}>{selectedOverview.objective}</Text>
-                )}
-
-                <View style={casesStyles.modalSection}>
-                  <Text style={casesStyles.modalSectionTitle}>Main Achievements</Text>
-                  {selectedOverview.achievements.map((achievement) => (
-                    <View key={achievement.id} style={casesStyles.achievementRow}>
-                      <Text style={casesStyles.achievementTitle}>{achievement.title}</Text>
-                      {achievement.weightPercent != null && (
-                        <Text style={casesStyles.achievementWeight}>{achievement.weightPercent}%</Text>
-                      )}
-                    </View>
-                  ))}
-                </View>
-
                 <View style={casesStyles.preceptorChatBox}>
                   <Text style={casesStyles.modalSectionTitle}>Dr. Martinez says:</Text>
                   <View style={casesStyles.preceptorChatMessages}>

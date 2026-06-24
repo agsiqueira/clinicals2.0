@@ -240,7 +240,8 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       loadProgress();
-    }, [loadProgress])
+      loadRoadmap();
+    }, [loadProgress, loadRoadmap])
   );
 
   useEffect(() => {

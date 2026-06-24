@@ -1,0 +1,142 @@
+{
+  "case_id": "seasonal_allergies_level1",
+  "level": 1,
+  "display_title": "Seasonal Allergies",
+  "setting": "telehealth_outpatient",
+  "time_allowed_minutes": 15,
+  "frame": "Outpatient telehealth OSCE",
+  "primary_tasks": [
+    "History of Present Illness",
+    "Focused Review of Symptoms",
+    "Plausible Diagnosis",
+    "Patient Plan and Education"
+  ],
+
+  "patient_profile": {
+    "first_name": "Sarah",
+    "last_name": "Johnson",
+    "preferred_name": "Sarah",
+    "date_of_birth": "1998-04-18",
+    "age": 28,
+    "sex": "female",
+    "communication_style": "friendly, mildly frustrated by recurring symptoms, cooperative",
+    "background": "elementary school teacher"
+  },
+
+  "osce_opening": {
+    "student_intro": "Hello, my name is _________, I am a UF, DNP student. May I call you by your first name?",
+    "patient_name_permission": {
+      "yes": "Yes, Sarah is fine.",
+      "no": "I would prefer Sarah Johnson."
+    },
+    "student_prompt_variants": [
+      "How can I help you today?",
+      "What brings you in today?"
+    ],
+    "patient_chief_complaint_reply": "My seasonal allergies are getting worse."
+  },
+
+  "social_history": {
+    "occupation": "Elementary school teacher",
+    "living_situation": "Lives with a roommate",
+    "alcohol_use": "Occasional social alcohol use",
+    "tobacco_use": "None",
+    "drug_use": {
+      "marijuana": "None",
+      "other_illicit_drugs": "None"
+    }
+  },
+
+  "presenting_info": {
+    "chief_complaint": "My seasonal allergies are getting worse.",
+    "opening_statement": "My seasonal allergies are getting worse."
+  },
+
+  "physical_exam_if_asked": {
+    "general": "Alert, speaking comfortably in full sentences",
+    "eyes": "Mild watery eyes by report",
+    "nose": "Nasal congestion by report",
+    "lungs": "No wheezing or shortness of breath by report"
+  },
+
+  "irrelevant_exam_pushback": "Why would you need to check that for allergies?",
+
+  "history": {
+    "family_history": {
+      "parents": "Mother has seasonal allergies",
+      "siblings": "One brother, healthy",
+      "patient_attitude": "Patient is not sure family history matters but answers when asked."
+    },
+    "old_carts": {
+      "onset": "Symptoms started getting worse about 2 weeks ago",
+      "location": "Nose and eyes",
+      "duration": "Symptoms occur most days during spring",
+      "character": "Sneezing, nasal congestion, and itchy watery eyes",
+      "aggravating_factors": "Worse outdoors and after recess duty at school",
+      "relieving_factors": "Improved somewhat with over-the-counter antihistamines",
+      "severity": "Annoying but not severe; about 5/10 discomfort",
+      "timing": "Worse during spring, especially on high pollen days"
+    },
+    "symptoms": {
+      "sneezing": true,
+      "nasal_congestion": true,
+      "itchy_eyes": true,
+      "watery_eyes": true,
+      "cough": false,
+      "wheezing": false,
+      "shortness_of_breath": false,
+      "fever": false
+    },
+    "contextual_factors": {
+      "season": "Spring",
+      "outdoor_exposure": "Worse outdoors",
+      "work_exposure": "Outdoor recess duty at school worsens symptoms"
+    },
+    "pertinent_negatives": [
+      "No fever",
+      "No shortness of breath",
+      "No wheezing",
+      "No chest pain",
+      "No severe facial pain",
+      "No thick green nasal drainage",
+      "No known sick contacts"
+    ],
+    "past_medical_history": {
+      "overall_health": "Generally healthy",
+      "prior_illnesses": [
+        "Seasonal allergies most springs"
+      ],
+      "hospitalizations": "None",
+      "surgeries": "None"
+    },
+    "allergies": [
+      "No medication allergies known"
+    ],
+    "medications": [
+      {
+        "name": "Over-the-counter antihistamine",
+        "effect": "Helps somewhat but symptoms persist"
+      }
+    ]
+  },
+
+  "optional_clinical_data": {
+    "labs_available": false,
+    "available_tests": []
+  },
+
+  "hidden_truth": {
+    "primary_diagnosis": "Seasonal allergic rhinitis",
+    "differentials": [
+      "Viral upper respiratory infection",
+      "Acute bacterial sinusitis",
+      "Asthma or reactive airway disease"
+    ],
+    "red_flags": [
+      "fever",
+      "shortness of breath",
+      "wheezing",
+      "severe facial pain"
+    ]
+  }
+}

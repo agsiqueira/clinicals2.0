@@ -14,6 +14,7 @@ const {
 } = require("../src/utils/achievementScoring");
 const {
   buildSessionDebriefPayload,
+  evaluateSessionPass,
   resolvePatientSessionForAttempt,
 } = require("../src/services/sessionAttempts");
 
@@ -41,6 +42,36 @@ const firstPatientAchievements = [
     title: "Chief Complaint",
     weightPercent: 50,
     rubricCriterionIds: ["reporter_chief_complaint"],
+  },
+];
+
+const firstPatientHpiAchievements = [
+  {
+    id: "formal-introduction",
+    title: "Formal Introduction",
+    weightPercent: 33.33,
+    requiredForCompletion: true,
+    rubricCriterionIds: [
+      "professional_intro_name",
+      "professional_intro_role_title",
+      "professional_preferred_name",
+      "professional_identity_two_identifiers",
+      "professional_communication_humanism",
+    ],
+  },
+  {
+    id: "chief-complaint",
+    title: "Chief Complaint",
+    weightPercent: 33.33,
+    requiredForCompletion: true,
+    rubricCriterionIds: ["reporter_chief_complaint"],
+  },
+  {
+    id: "hpi-summary",
+    title: "HPI Summary",
+    weightPercent: 33.33,
+    requiredForCompletion: true,
+    rubricCriterionIds: ["reporter_hpi_summary_oldcarts"],
   },
 ];
 
@@ -103,6 +134,87 @@ test("determineBadgeTier follows Clinicals 2.0 thresholds", () => {
   assert.equal(determineBadgeTier(49.99), "BRONZE");
   assert.equal(determineBadgeTier(0.01), "BRONZE");
   assert.equal(determineBadgeTier(0), "NONE");
+});
+
+test("First Patient Complete HPI achievement maps reporter_hpi_summary_oldcarts", () => {
+  const achievementResults = computeAchievementResults(firstPatientHpiAchievements, [
+    {
+      id: "professional_intro_name",
+      label: "Introduces self by name",
+      earned_points: 0.5,
+      points: 0.5,
+    },
+    {
+      id: "professional_intro_role_title",
+      label: "States role",
+      earned_points: 0.5,
+      points: 0.5,
+    },
+    {
+      id: "professional_preferred_name",
+      label: "Uses preferred name",
+      earned_points: 0.5,
+      points: 0.5,
+    },
+    {
+      id: "professional_identity_two_identifiers",
+      label: "Confirms identity",
+      earned_points: 1,
+      points: 1,
+    },
+    {
+      id: "professional_communication_humanism",
+      label: "Humanistic communication",
+      earned_points: 0.5,
+      points: 0.5,
+    },
+    {
+      id: "reporter_chief_complaint",
+      label: "Chief complaint",
+      earned_points: 0.5,
+      points: 0.5,
+    },
+    {
+      id: "reporter_hpi_summary_oldcarts",
+      label: "HPI summary includes OLDCARTS-focused presenting illness synthesis",
+      earned_points: 2,
+      points: 2,
+    },
+  ]);
+
+  const hpiResult = achievementResults.find((result) => result.achievementId === "hpi-summary");
+  assert.equal(hpiResult.percentScore, 100);
+  assert.equal(hpiResult.weightedScore, 33.33);
+  assert.equal(computeSessionScore(achievementResults), 99.99);
+});
+
+test("evaluateSessionPass passes only when all required achievements are at least 84", () => {
+  const passingResults = [
+    { achievementId: "formal-introduction", percentScore: 84, achieved: true },
+    { achievementId: "chief-complaint", percentScore: 100, achieved: true },
+    { achievementId: "hpi-summary", percentScore: 90, achieved: true },
+  ];
+
+  const failingResults = [
+    { achievementId: "formal-introduction", percentScore: 100, achieved: true },
+    { achievementId: "chief-complaint", percentScore: 83, achieved: false },
+    { achievementId: "hpi-summary", percentScore: 100, achieved: true },
+  ];
+
+  const passing = evaluateSessionPass({
+    achievementResults: passingResults,
+    achievements: firstPatientHpiAchievements,
+  });
+  const failing = evaluateSessionPass({
+    achievementResults: failingResults,
+    achievements: firstPatientHpiAchievements,
+  });
+
+  assert.equal(passing.passed, true);
+  assert.equal(passing.blockingAchievements.length, 0);
+  assert.equal(failing.passed, false);
+  assert.equal(failing.blockingAchievements.length, 1);
+  assert.equal(failing.blockingAchievements[0].title, "Chief Complaint");
 });
 
 test("buildSessionDebriefPayload returns concise Dr. Martinez debrief data", () => {

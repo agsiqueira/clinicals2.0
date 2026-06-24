@@ -22,13 +22,16 @@ function findBestAttempt(attempts = []) {
 function buildSessionStatus({ session, previousCompleted }) {
   const bestAttempt = findBestAttempt(session.attempts || []);
   const completed = Boolean(bestAttempt?.badgeTier);
+  const bestSessionScore = bestAttempt?.sessionScore ?? null;
+  const unlocksNext = Number(bestSessionScore ?? -1) >= 84;
   const status = completed ? "completed" : previousCompleted ? "available" : "locked";
 
   return {
     status,
     completed,
+    unlocksNext,
     badgeTier: bestAttempt?.badgeTier || null,
-    bestSessionScore: bestAttempt?.sessionScore ?? null,
+    bestSessionScore,
     latestSessionScore: session.attempts?.[0]?.sessionScore ?? null,
   };
 }
@@ -42,6 +45,7 @@ function summarizeAchievement(achievement) {
     competencyArea: achievement.competencyArea,
     weightPercent: achievement.weightPercent,
     rubricCriterionIds: achievement.rubricCriterionIds || [],
+    requiredForCompletion: Boolean(achievement.requiredForCompletion),
   };
 }
 
@@ -100,25 +104,31 @@ function buildLearningPathRoadmap(learningPaths = []) {
           avatarUrl: path.preceptorPersona.avatarUrl,
         }
       : null,
-    units: (path.units || []).sort(sortByOrderAndTitle).map((unit) => {
-      let previousCompleted = true;
-      const sessions = (unit.sessions || []).sort(sortByOrderAndTitle).map((session) => {
-        const statusSummary = buildSessionStatus({ session, previousCompleted });
-        previousCompleted = statusSummary.completed;
-        return summarizePatientSession(session, statusSummary);
-      });
+    units: (() => {
+      let unitUnlocked = true;
 
-      return {
-        id: unit.id,
-        slug: unit.slug,
-        title: unit.title,
-        description: unit.description,
-        objective: unit.objective,
-        active: unit.active,
-        sortOrder: unit.sortOrder,
-        sessions,
-      };
-    }),
+      return (path.units || []).sort(sortByOrderAndTitle).map((unit) => {
+        let previousUnlockedNext = unitUnlocked;
+        const sessions = (unit.sessions || []).sort(sortByOrderAndTitle).map((session) => {
+          const statusSummary = buildSessionStatus({ session, previousCompleted: previousUnlockedNext });
+          previousUnlockedNext = statusSummary.unlocksNext;
+          return summarizePatientSession(session, statusSummary);
+        });
+
+        unitUnlocked = previousUnlockedNext;
+
+        return {
+          id: unit.id,
+          slug: unit.slug,
+          title: unit.title,
+          description: unit.description,
+          objective: unit.objective,
+          active: unit.active,
+          sortOrder: unit.sortOrder,
+          sessions,
+        };
+      });
+    })(),
   }));
 }
 

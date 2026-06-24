@@ -7,6 +7,7 @@ const { loadGrading } = require("../src/utils/caseLoader");
 dotenv.config();
 
 const FIRST_PATIENT_CASE_ID = "uti_level1";
+const SEASONAL_ALLERGIES_CASE_ID = "seasonal_allergies_level1";
 
 const FORMAL_INTRODUCTION_CRITERIA = [
   "professional_intro_name",
@@ -17,6 +18,7 @@ const FORMAL_INTRODUCTION_CRITERIA = [
 ];
 
 const CHIEF_COMPLAINT_CRITERIA = ["reporter_chief_complaint"];
+const HPI_SUMMARY_CRITERIA = ["reporter_hpi_summary_oldcarts"];
 
 function collectRubricCriterionIds(gradingData) {
   const rubric = gradingData?.rubric || {};
@@ -34,20 +36,66 @@ function collectRubricCriterionIds(gradingData) {
   return ids;
 }
 
-async function validateRubricMappings() {
-  const gradingData = await loadGrading(FIRST_PATIENT_CASE_ID);
+async function upsertAchievement({
+  patientSessionId,
+  slug,
+  title,
+  weightPercent,
+  rubricCriterionIds,
+  sortOrder,
+  requiredForCompletion = false,
+}) {
+  return prisma.achievement.upsert({
+    where: {
+      patientSessionId_slug: {
+        patientSessionId,
+        slug,
+      },
+    },
+    create: {
+      patientSessionId,
+      slug,
+      title,
+      weightPercent,
+      rubricCriterionIds,
+      requiredForCompletion,
+      sortOrder,
+      active: true,
+    },
+    update: {
+      title,
+      weightPercent,
+      rubricCriterionIds,
+      requiredForCompletion,
+      sortOrder,
+      active: true,
+    },
+  });
+}
+
+async function validateRubricMappingsForCase(caseId) {
+  const gradingData = await loadGrading(caseId);
   if (!gradingData) {
-    console.warn(`[seed] No grading rubric found for ${FIRST_PATIENT_CASE_ID}.`);
+    console.warn(`[seed] No grading rubric found for ${caseId}.`);
     return;
   }
 
   const availableIds = collectRubricCriterionIds(gradingData);
-  const mappedIds = [...FORMAL_INTRODUCTION_CRITERIA, ...CHIEF_COMPLAINT_CRITERIA];
+  const mappedIds = [
+    ...FORMAL_INTRODUCTION_CRITERIA,
+    ...CHIEF_COMPLAINT_CRITERIA,
+    ...HPI_SUMMARY_CRITERIA,
+  ];
   const missingIds = mappedIds.filter((id) => !availableIds.has(id));
 
   if (missingIds.length > 0) {
-    console.warn(`[seed] Missing mapped rubric criteria: ${missingIds.join(", ")}`);
+    console.warn(`[seed] ${caseId} missing mapped rubric criteria: ${missingIds.join(", ")}`);
   }
+}
+
+async function validateRubricMappings() {
+  await validateRubricMappingsForCase(FIRST_PATIENT_CASE_ID);
+  await validateRubricMappingsForCase(SEASONAL_ALLERGIES_CASE_ID);
 }
 
 async function seedClinicals2() {
@@ -63,6 +111,16 @@ async function seedClinicals2() {
   if (!patientCase) {
     throw new Error(
       `Case ${FIRST_PATIENT_CASE_ID} was not found after case sync. Cannot seed First Patient.`
+    );
+  }
+
+  const seasonalAllergiesCase = await prisma.case.findUnique({
+    where: { caseId: SEASONAL_ALLERGIES_CASE_ID },
+  });
+
+  if (!seasonalAllergiesCase) {
+    throw new Error(
+      `Case ${SEASONAL_ALLERGIES_CASE_ID} was not found after case sync. Cannot seed Seasonal Allergies.`
     );
   }
 
@@ -142,7 +200,7 @@ async function seedClinicals2() {
       unitId: unit.id,
       caseId: patientCase.id,
       slug: "first-patient",
-      title: "First Patient",
+      title: "First Patient: Introduction and Chief Complaint",
       objective: "Meet your first patient and begin the clinical encounter.",
       description:
         "Practice a professional opening and elicit the patient's chief complaint.",
@@ -156,7 +214,7 @@ async function seedClinicals2() {
     },
     update: {
       caseId: patientCase.id,
-      title: "First Patient",
+      title: "First Patient: Introduction and Chief Complaint",
       objective: "Meet your first patient and begin the clinical encounter.",
       description:
         "Practice a professional opening and elicit the patient's chief complaint.",
@@ -170,54 +228,185 @@ async function seedClinicals2() {
     },
   });
 
-  await prisma.achievement.upsert({
+  await upsertAchievement({
+    patientSessionId: patientSession.id,
+    slug: "formal-introduction",
+    title: "Formal Introduction",
+    weightPercent: 50,
+    rubricCriterionIds: FORMAL_INTRODUCTION_CRITERIA,
+    sortOrder: 1,
+  });
+
+  await upsertAchievement({
+    patientSessionId: patientSession.id,
+    slug: "chief-complaint",
+    title: "Chief Complaint",
+    weightPercent: 50,
+    rubricCriterionIds: CHIEF_COMPLAINT_CRITERIA,
+    sortOrder: 2,
+  });
+
+  const hpiPatientSession = await prisma.patientSession.upsert({
     where: {
-      patientSessionId_slug: {
-        patientSessionId: patientSession.id,
-        slug: "formal-introduction",
+      unitId_slug: {
+        unitId: unit.id,
+        slug: "first-patient-hpi",
       },
     },
     create: {
-      patientSessionId: patientSession.id,
-      slug: "formal-introduction",
-      title: "Formal Introduction",
-      weightPercent: 50,
-      rubricCriterionIds: FORMAL_INTRODUCTION_CRITERIA,
+      unitId: unit.id,
+      caseId: patientCase.id,
+      slug: "first-patient-hpi",
+      title: "First Patient: Complete HPI",
+      objective: "Complete the patient encounter and submit an HPI summary.",
+      description:
+        "Practice a professional opening, elicit the chief complaint, and complete an OLDCARTS-focused HPI.",
+      goldThreshold: 84,
+      silverThreshold: 50,
+      bronzeThreshold: 1,
+      estimatedMinutesMin: 5,
+      estimatedMinutesMax: 8,
+      sortOrder: 2,
+      active: true,
+    },
+    update: {
+      caseId: patientCase.id,
+      title: "First Patient: Complete HPI",
+      objective: "Complete the patient encounter and submit an HPI summary.",
+      description:
+        "Practice a professional opening, elicit the chief complaint, and complete an OLDCARTS-focused HPI.",
+      goldThreshold: 84,
+      silverThreshold: 50,
+      bronzeThreshold: 1,
+      estimatedMinutesMin: 5,
+      estimatedMinutesMax: 8,
+      sortOrder: 2,
+      active: true,
+    },
+  });
+
+  await upsertAchievement({
+    patientSessionId: hpiPatientSession.id,
+    slug: "formal-introduction",
+    title: "Formal Introduction",
+    weightPercent: 33.33,
+    rubricCriterionIds: FORMAL_INTRODUCTION_CRITERIA,
+    requiredForCompletion: true,
+    sortOrder: 1,
+  });
+
+  await upsertAchievement({
+    patientSessionId: hpiPatientSession.id,
+    slug: "chief-complaint",
+    title: "Chief Complaint",
+    weightPercent: 33.33,
+    rubricCriterionIds: CHIEF_COMPLAINT_CRITERIA,
+    requiredForCompletion: true,
+    sortOrder: 2,
+  });
+
+  await upsertAchievement({
+    patientSessionId: hpiPatientSession.id,
+    slug: "hpi-summary",
+    title: "HPI Summary",
+    weightPercent: 33.33,
+    rubricCriterionIds: HPI_SUMMARY_CRITERIA,
+    requiredForCompletion: true,
+    sortOrder: 3,
+  });
+
+  const unit2 = await prisma.unit.upsert({
+    where: {
+      learningPathId_slug: {
+        learningPathId: learningPath.id,
+        slug: "seasonal-allergies",
+      },
+    },
+    create: {
+      learningPathId: learningPath.id,
+      slug: "seasonal-allergies",
+      title: "Seasonal Allergies",
+      objective:
+        "Practice beginning an allergy-focused visit and collecting the key symptom history.",
+      sortOrder: 2,
+      active: true,
+    },
+    update: {
+      title: "Seasonal Allergies",
+      objective:
+        "Practice beginning an allergy-focused visit and collecting the key symptom history.",
+      sortOrder: 2,
+      active: true,
+    },
+  });
+
+  const seasonalHpiSession = await prisma.patientSession.upsert({
+    where: {
+      unitId_slug: {
+        unitId: unit2.id,
+        slug: "seasonal-allergies-complete-hpi",
+      },
+    },
+    create: {
+      unitId: unit2.id,
+      caseId: seasonalAllergiesCase.id,
+      slug: "seasonal-allergies-complete-hpi",
+      title: "Seasonal Allergies: Complete HPI",
+      objective: "Complete Sarah Johnson's seasonal allergy encounter and submit an HPI.",
+      description:
+        "Practice a professional opening, elicit the chief complaint, and summarize the key allergy HPI facts.",
+      goldThreshold: 84,
+      silverThreshold: 50,
+      bronzeThreshold: 1,
+      estimatedMinutesMin: 5,
+      estimatedMinutesMax: 8,
       sortOrder: 1,
       active: true,
     },
     update: {
-      title: "Formal Introduction",
-      weightPercent: 50,
-      rubricCriterionIds: FORMAL_INTRODUCTION_CRITERIA,
+      caseId: seasonalAllergiesCase.id,
+      title: "Seasonal Allergies: Complete HPI",
+      objective: "Complete Sarah Johnson's seasonal allergy encounter and submit an HPI.",
+      description:
+        "Practice a professional opening, elicit the chief complaint, and summarize the key allergy HPI facts.",
+      goldThreshold: 84,
+      silverThreshold: 50,
+      bronzeThreshold: 1,
+      estimatedMinutesMin: 5,
+      estimatedMinutesMax: 8,
       sortOrder: 1,
       active: true,
     },
   });
 
-  await prisma.achievement.upsert({
-    where: {
-      patientSessionId_slug: {
-        patientSessionId: patientSession.id,
-        slug: "chief-complaint",
-      },
-    },
-    create: {
-      patientSessionId: patientSession.id,
-      slug: "chief-complaint",
-      title: "Chief Complaint",
-      weightPercent: 50,
-      rubricCriterionIds: CHIEF_COMPLAINT_CRITERIA,
-      sortOrder: 2,
-      active: true,
-    },
-    update: {
-      title: "Chief Complaint",
-      weightPercent: 50,
-      rubricCriterionIds: CHIEF_COMPLAINT_CRITERIA,
-      sortOrder: 2,
-      active: true,
-    },
+  await upsertAchievement({
+    patientSessionId: seasonalHpiSession.id,
+    slug: "formal-introduction",
+    title: "Formal Introduction",
+    weightPercent: 33.33,
+    rubricCriterionIds: FORMAL_INTRODUCTION_CRITERIA,
+    requiredForCompletion: true,
+    sortOrder: 1,
+  });
+
+  await upsertAchievement({
+    patientSessionId: seasonalHpiSession.id,
+    slug: "chief-complaint",
+    title: "Chief Complaint",
+    weightPercent: 33.33,
+    rubricCriterionIds: CHIEF_COMPLAINT_CRITERIA,
+    requiredForCompletion: true,
+    sortOrder: 2,
+  });
+
+  await upsertAchievement({
+    patientSessionId: seasonalHpiSession.id,
+    slug: "hpi-summary",
+    title: "HPI Summary",
+    weightPercent: 33.34,
+    rubricCriterionIds: HPI_SUMMARY_CRITERIA,
+    requiredForCompletion: true,
+    sortOrder: 3,
   });
 
   console.log("[seed] Clinicals 2.0 Phase 2 seed complete.");

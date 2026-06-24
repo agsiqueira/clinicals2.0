@@ -29,8 +29,16 @@ function buildDebriefChatSystemPrompt({ debrief }) {
     "Answer only the student's question with practical coaching grounded in the report.",
     `Session score: ${debrief?.sessionScore ?? 0}%.`,
     `Badge tier: ${debrief?.badgeTier || "NONE"}.`,
+    debrief?.passed == null ? null : `Session passed required achievements: ${debrief.passed ? "yes" : "no"}.`,
+    debrief?.blockingAchievements?.length
+      ? `Required achievements blocking pass: ${debrief.blockingAchievements
+          .map((achievement) => achievement.title)
+          .join(", ")}.`
+      : null,
     achievements ? `Achievement results:\n${achievements}` : "Achievement results: unavailable.",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 module.exports = {

@@ -100,9 +100,56 @@ function summarizeAchievementResults({ achievementResults, achievementsById }) {
       percentScore: result.percentScore,
       weightedScore: result.weightedScore,
       achieved: result.achieved,
+      requiredForCompletion: Boolean(achievement?.requiredForCompletion),
       feedback: result.feedback || null,
     };
   });
+}
+
+function evaluateSessionPass({ achievementResults, achievements }) {
+  const achievementsById = new Map((achievements || []).map((achievement) => [achievement.id, achievement]));
+  const requiredResults = (achievementResults || []).filter((result) =>
+    Boolean(achievementsById.get(result.achievementId)?.requiredForCompletion)
+  );
+
+  if (requiredResults.length === 0) {
+    return {
+      passed: null,
+      requiredAchievementResults: [],
+      blockingAchievements: [],
+      rule: "NO_REQUIRED_ACHIEVEMENTS",
+    };
+  }
+
+  const blockingAchievements = requiredResults
+    .filter((result) => !result.achieved)
+    .map((result) => {
+      const achievement = achievementsById.get(result.achievementId);
+      return {
+        achievementId: result.achievementId,
+        slug: achievement?.slug || null,
+        title: achievement?.title || "Achievement",
+        percentScore: result.percentScore,
+        requiredPercent: 84,
+      };
+    });
+
+  return {
+    passed: blockingAchievements.length === 0,
+    requiredAchievementResults: requiredResults.map((result) => {
+      const achievement = achievementsById.get(result.achievementId);
+      return {
+        achievementId: result.achievementId,
+        slug: achievement?.slug || null,
+        title: achievement?.title || "Achievement",
+        percentScore: result.percentScore,
+        achieved: result.achieved,
+        requiredPercent: 84,
+      };
+    }),
+    blockingAchievements,
+    rule: "ALL_REQUIRED_ACHIEVEMENTS_AT_LEAST_84",
+  };
 }
 
 function buildConciseDebriefContent({ feedback, badgeTier, sessionScore, achievementSummaries }) {
@@ -155,6 +202,15 @@ function buildDebriefGreeting({ achievementSummaries }) {
   return `Thanks for completing the session. As you review your report, pay particular attention to ${focusArea}. When you're ready, I'd be happy to discuss what happened and how to improve next time.`;
 }
 
+function buildPassAwareDebriefGreeting({ achievementSummaries, passEvaluation }) {
+  if (passEvaluation?.passed === false && passEvaluation.blockingAchievements?.length > 0) {
+    const blockedBy = formatFocusArea(passEvaluation.blockingAchievements.map((item) => item.title));
+    return `Thanks for completing the session. This attempt did not pass because ${blockedBy} was below the required level. Review your report, then ask me how to improve next time.`;
+  }
+
+  return buildDebriefGreeting({ achievementSummaries });
+}
+
 function buildSessionDebriefPayload({
   sessionAttemptId,
   sessionScore,
@@ -162,6 +218,7 @@ function buildSessionDebriefPayload({
   achievementResults,
   achievements,
   feedback,
+  passEvaluation,
 }) {
   if (!sessionAttemptId) return null;
 
@@ -184,7 +241,10 @@ function buildSessionDebriefPayload({
     sessionScore: score,
     badgeTier: tier,
     badgeLabel: badgeLabel(tier),
-    greeting: buildDebriefGreeting({ achievementSummaries }),
+    passed: passEvaluation?.passed ?? null,
+    passRule: passEvaluation?.rule || null,
+    blockingAchievements: passEvaluation?.blockingAchievements || [],
+    greeting: buildPassAwareDebriefGreeting({ achievementSummaries, passEvaluation }),
     recognition: debrief.recognition,
     coaching: debrief.coaching,
     encouragement: debrief.encouragement,
@@ -219,6 +279,14 @@ async function finalizeSessionAttemptFromSubmission({ sessionAttemptId, submissi
   );
   const sessionScore = computeSessionScore(achievementResults);
   const badgeTier = determineBadgeTier(sessionScore);
+  const passEvaluation = evaluateSessionPass({
+    achievementResults,
+    achievements: sessionAttempt.patientSession.achievements,
+  });
+  const passed =
+    passEvaluation.passed == null
+      ? sessionScore >= sessionAttempt.patientSession.goldThreshold
+      : passEvaluation.passed;
 
   const feedback = buildPlaceholderFeedback({ badgeTier, sessionScore, achievementResults });
 
@@ -265,11 +333,12 @@ async function finalizeSessionAttemptFromSubmission({ sessionAttemptId, submissi
         scoredAt: new Date(),
         sessionScore,
         badgeTier,
-        passed: sessionScore >= sessionAttempt.patientSession.goldThreshold,
+        passed,
         clinicalScoreDetails: {
           source_submission_id: submission.id,
           source_conversation_id: submission.conversationId,
           achievement_results: achievementResults,
+          pass_evaluation: passEvaluation,
         },
       },
     }),
@@ -315,6 +384,7 @@ async function finalizeSessionAttemptFromSubmission({ sessionAttemptId, submissi
       achievementResults,
       achievements: sessionAttempt.patientSession.achievements,
       feedback,
+      passEvaluation,
     }),
   };
 }
@@ -343,12 +413,14 @@ async function getSessionDebriefForAttempt(sessionAttemptId) {
     achievementResults: sessionAttempt.achievementResults,
     achievements: sessionAttempt.achievementResults.map((result) => result.achievement),
     feedback: sessionAttempt.feedback,
+    passEvaluation: sessionAttempt.clinicalScoreDetails?.pass_evaluation || null,
   });
 }
 
 module.exports = {
   buildSessionDebriefPayload,
   createSessionAttemptForConversation,
+  evaluateSessionPass,
   finalizeSessionAttemptFromSubmission,
   getSessionDebriefForAttempt,
   getOrCreateSessionAttemptForConversation,

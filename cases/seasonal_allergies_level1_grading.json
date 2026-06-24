@@ -1,0 +1,294 @@
+{
+  "case_id": "seasonal_allergies_level1",
+  "grading_version": "2.0",
+  "rubric": {
+    "profile": "CPI1",
+    "passing_score": 84,
+    "sections": [
+      {
+        "id": "professional",
+        "label": "Professional",
+        "max_points": 3
+      },
+      {
+        "id": "reporter",
+        "label": "Reporter",
+        "max_points": 17
+      },
+      {
+        "id": "interpreter",
+        "label": "Interpreter",
+        "max_points": 1
+      },
+      {
+        "id": "manager",
+        "label": "Manager",
+        "max_points": 1
+      }
+    ],
+    "reporter_point_model": {
+      "total_points": 17,
+      "history_points_target": 15,
+      "case_presentation_points_target": 2,
+      "implementation_note": "Focused seasonal allergy station emphasizes professional opening, chief complaint, key allergy HPI facts, and written HPI synthesis."
+    },
+    "common_criteria": [
+      "professional_intro_name",
+      "professional_intro_role_title",
+      {
+        "id": "professional_preferred_name",
+        "points": 0.5
+      },
+      "professional_identity_two_identifiers"
+    ],
+    "criteria": [
+      {
+        "id": "professional_communication_humanism",
+        "section": "professional",
+        "label": "Demonstrates professional communication and humanistic rapport",
+        "points": 0.5,
+        "source": "all",
+        "mode": "llm_or_rule",
+        "tags": ["professional"],
+        "prompt_hint": "Judge transcript-level professionalism and humanistic communication: respectful language, appropriate interview flow, avoids unnecessary repetition/jargon, and shows empathy/consideration.",
+        "fallback_rule": {
+          "groups": [
+            ["what brings you", "how can i help", "tell me more", "can you describe"],
+            ["thank you", "i understand", "i'm sorry", "that sounds", "appreciate you sharing"]
+          ],
+          "min_groups_matched": 1
+        }
+      },
+      {
+        "id": "reporter_chief_complaint",
+        "section": "reporter",
+        "label": "Elicits chief complaint with an open-ended question",
+        "points": 0.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician invites the chief complaint using an open-ended opener such as 'What brings you in today?' or 'How can I help you today?'.",
+        "rule": {
+          "any": [
+            "how can i help you today",
+            "what brings you in today",
+            "what brings you today",
+            "what brings you in"
+          ]
+        }
+      },
+      {
+        "id": "reporter_oldcarts_bundle",
+        "section": "reporter",
+        "label": "Elicits allergy symptom detail bundle",
+        "points": 2,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician elicits at least 5 relevant symptom details: onset, location, duration/timing, character, severity, triggers/worse factors, and treatments/relieving factors.",
+        "rule": {
+          "min_groups_matched": 5,
+          "groups": [
+            ["onset", "when did", "started", "began"],
+            ["where", "location", "nose", "eyes"],
+            ["duration", "how long", "how often"],
+            ["sneezing", "congestion", "itchy", "watery eyes"],
+            ["severity", "scale", "/10", "how bad"],
+            ["worse", "trigger", "outdoors", "pollen", "spring"],
+            ["better", "improve", "antihistamine", "medicine", "medication", "tried"]
+          ]
+        }
+      },
+      {
+        "id": "reporter_hpi_summary_oldcarts",
+        "section": "reporter",
+        "label": "HPI summary includes allergy-focused presenting illness synthesis",
+        "points": 2,
+        "source": "hpi",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "Evaluate the end-of-case HPI written by the user/clinician. Award full credit when the HPI is a coherent 4-5 sentence summary that captures at least 5 relevant allergy HPI elements: symptoms, timing/seasonality, outdoor trigger, spring worsening, antihistamine response, and pertinent negatives.",
+        "rule": {
+          "min_groups_matched": 5,
+          "groups": [
+            ["seasonal allergies", "allergies", "allergic rhinitis"],
+            ["sneezing"],
+            ["nasal congestion", "congestion", "stuffy nose"],
+            ["itchy eyes", "watery eyes"],
+            ["outdoors", "outside", "pollen"],
+            ["spring", "seasonal"],
+            ["antihistamine", "antihistamines", "otc allergy medication"],
+            ["no fever", "denies fever"],
+            ["no shortness of breath", "denies shortness of breath", "no sob"]
+          ]
+        }
+      },
+      {
+        "id": "reporter_sneezing",
+        "section": "reporter",
+        "label": "Assesses sneezing",
+        "points": 1.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["sneezing", "sneeze"]
+        }
+      },
+      {
+        "id": "reporter_nasal_congestion",
+        "section": "reporter",
+        "label": "Assesses nasal congestion",
+        "points": 1.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["nasal congestion", "congestion", "stuffy nose", "runny nose"]
+        }
+      },
+      {
+        "id": "reporter_itchy_eyes",
+        "section": "reporter",
+        "label": "Assesses itchy or watery eyes",
+        "points": 1.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["itchy eyes", "watery eyes", "eye itching", "eyes itch"]
+        }
+      },
+      {
+        "id": "reporter_outdoor_trigger",
+        "section": "reporter",
+        "label": "Assesses outdoor or pollen trigger",
+        "points": 1.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["outdoors", "outside", "pollen", "trigger", "worse outside"]
+        }
+      },
+      {
+        "id": "reporter_spring_seasonality",
+        "section": "reporter",
+        "label": "Assesses spring seasonality",
+        "points": 1.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["spring", "seasonal", "this season", "time of year"]
+        }
+      },
+      {
+        "id": "reporter_antihistamine_response",
+        "section": "reporter",
+        "label": "Assesses antihistamine or allergy medication response",
+        "points": 1.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "rule": {
+          "any": ["antihistamine", "antihistamines", "allergy medication", "allergy medicine", "claritin", "zyrtec", "allegra", "benadryl", "what have you tried"]
+        }
+      },
+      {
+        "id": "reporter_fever",
+        "section": "reporter",
+        "label": "Assesses fever",
+        "points": 1.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history", "red_flag", "critical_fail"],
+        "rule": {
+          "any": ["fever", "temperature", "chills"]
+        }
+      },
+      {
+        "id": "reporter_shortness_of_breath",
+        "section": "reporter",
+        "label": "Assesses shortness of breath or wheezing",
+        "points": 1.5,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history", "red_flag", "critical_fail"],
+        "rule": {
+          "any": ["shortness of breath", "sob", "trouble breathing", "wheezing", "wheeze"]
+        }
+      },
+      {
+        "id": "reporter_medication_allergies",
+        "section": "reporter",
+        "label": "Assesses allergies and current medications",
+        "points": 1,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "tags": ["required_history"],
+        "prompt_hint": "The user/clinician asks about medication/food allergies and asks what prescription/OTC/supplement medications the patient is currently using.",
+        "rule": {
+          "groups": [
+            ["allergies", "allergy", "medication allergies", "drug allergies", "food allergies"],
+            ["medications", "meds", "otc", "supplements", "what are you taking"]
+          ],
+          "min_groups_matched": 1
+        }
+      },
+      {
+        "id": "interpreter_likely_allergic_rhinitis",
+        "section": "interpreter",
+        "label": "Identifies allergic rhinitis as likely diagnosis",
+        "points": 1,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "rule": {
+          "any": ["allergic rhinitis", "seasonal allergies", "allergies"]
+        }
+      },
+      {
+        "id": "manager_symptom_plan",
+        "section": "manager",
+        "label": "Discusses basic symptom management or follow-up",
+        "points": 1,
+        "source": "user",
+        "mode": "llm_or_rule",
+        "rule": {
+          "any": ["antihistamine", "nasal spray", "avoid pollen", "follow up", "return", "worse"]
+        }
+      }
+    ]
+  },
+
+  "required_history_topics": [
+    "sneezing",
+    "nasal congestion",
+    "itchy eyes",
+    "worse outdoors",
+    "worse during spring",
+    "improved somewhat with antihistamines",
+    "no fever",
+    "no shortness of breath"
+  ],
+
+  "required_actions": [
+    "introduce self and role",
+    "confirm patient identity",
+    "elicit chief complaint",
+    "summarize HPI when required",
+    "screen for fever and shortness of breath red flags"
+  ],
+
+  "critical_fails": [
+    "failed to assess fever",
+    "failed to assess shortness of breath or wheezing"
+  ],
+
+  "scoring": {
+    "history_topic_points": 5,
+    "action_points": 10,
+    "critical_fail_penalty": 30,
+    "passing_score": 84
+  }
+}

@@ -445,6 +445,27 @@ function llmResultMatchesCriterionSource(llmResult, sourceText) {
   return { ok: true, matchedEvidence: matched, reason: null };
 }
 
+function buildRuleResult({ criterion, text, tags, points, rationale }) {
+  const fallbackRule = criterion.fallback_rule || criterion.rule || {};
+  const ruleResult = evaluateRule(text, fallbackRule);
+
+  return applyMissedPenalty(
+    {
+      id: criterion.id,
+      section: criterion.section,
+      label: criterion.label || criterion.id,
+      tags,
+      points,
+      earned_points: ruleResult.matched ? points : 0,
+      status: ruleResult.matched ? "met" : "missed",
+      omit_reason: null,
+      evidence: ruleResult.evidence,
+      rationale,
+    },
+    criterion
+  );
+}
+
 function evaluateCriterion(conversation, criterion, llmResults, supplementalInputs) {
   const enabled = criterion.enabled !== false;
   const tags = normalizeTags(criterion.tags);
@@ -494,6 +515,20 @@ function evaluateCriterion(conversation, criterion, llmResults, supplementalInpu
             ? "partially_met"
             : "missed"; // not_met -> missed 
 
+        if (mode === "llm_or_rule" && (llm.status === "not_met" || Number(llm.earned_points) === 0)) {
+          const fallbackResult = buildRuleResult({
+            criterion,
+            text,
+            tags,
+            points,
+            rationale: "Fallback rule used after LLM not_met.",
+          });
+
+          if (Number(fallbackResult.earned_points) > 0 || fallbackResult.status === "met") {
+            return fallbackResult;
+          }
+        }
+
         return finalize({
           id: criterion.id,
           section: criterion.section,
@@ -512,22 +547,14 @@ function evaluateCriterion(conversation, criterion, llmResults, supplementalInpu
 
     // missing LLM result -> fallback behavior
     if (mode === "llm_or_rule") {
-      const fallbackRule = criterion.fallback_rule || criterion.rule || {};
-      const ruleResult = evaluateRule(text, fallbackRule);
-
-      return finalize({
-        id: criterion.id,
-        section: criterion.section,
-        label: criterion.label || criterion.id,
+      return buildRuleResult({
+        criterion,
+        text,
         tags,
         points,
-        earned_points: ruleResult.matched ? points : 0,
-        status: ruleResult.matched ? "met" : "missed",
-        omit_reason: null,
-        evidence: ruleResult.evidence,
         rationale: llmDiscardReason
           ? `Fallback rule used (${llmDiscardReason}).`
-          : "Fallback rule used (LLM missing result)."
+          : "Fallback rule used (LLM missing result).",
       });
     }
 

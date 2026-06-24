@@ -458,4 +458,181 @@ export const caseStyles = StyleSheet.create({
     color: "#6b7280",
     textAlign: "center",
   },
+
+  debriefOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(17,24,39,0.55)",
+    justifyContent: "center",
+    padding: 16,
+  },
+
+  debriefCard: {
+    maxHeight: "90%",
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    overflow: "hidden",
+  },
+
+  debriefScrollContent: {
+    padding: 16,
+    gap: 14,
+  },
+
+  debriefHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+
+  debriefAvatarCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#ede9fe",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  debriefAvatarText: {
+    color: "#5b21b6",
+    fontWeight: "800",
+  },
+
+  debriefHeaderText: {
+    flex: 1,
+  },
+
+  debriefEyebrow: {
+    color: "#6d28d9",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+
+  debriefTitle: {
+    color: "#111827",
+    fontSize: 18,
+    fontWeight: "800",
+  },
+
+  debriefScoreRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+
+  debriefMentorBubble: {
+    alignSelf: "flex-start",
+    maxWidth: "94%",
+    borderWidth: 1,
+    borderColor: "#c7d2fe",
+    borderRadius: 8,
+    backgroundColor: "#eef2ff",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+  },
+
+  debriefMentorLabel: {
+    color: "#6d28d9",
+    fontSize: 11,
+    fontWeight: "800",
+  },
+
+  debriefMetricBox: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: "#f9fafb",
+  },
+
+  debriefMetricLabel: {
+    color: "#6b7280",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  debriefMetricValue: {
+    marginTop: 4,
+    color: "#111827",
+    fontSize: 20,
+    fontWeight: "800",
+  },
+
+  debriefSection: {
+    gap: 6,
+  },
+
+  debriefSectionTitle: {
+    color: "#374151",
+    fontWeight: "800",
+  },
+
+  debriefText: {
+    color: "#1f2937",
+    lineHeight: 20,
+  },
+
+  debriefAchievementRow: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    padding: 10,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  debriefAchievementMain: {
+    flex: 1,
+    gap: 4,
+  },
+
+  debriefAchievementTitle: {
+    color: "#111827",
+    fontWeight: "800",
+  },
+
+  debriefAchievementFeedback: {
+    color: "#6b7280",
+    lineHeight: 18,
+  },
+
+  debriefAchievementScore: {
+    color: "#6d28d9",
+    fontWeight: "800",
+  },
+
+  debriefActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+  },
+
+  debriefSecondaryButton: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+
+  debriefSecondaryButtonText: {
+    color: "#374151",
+    fontWeight: "800",
+  },
+
+  debriefPrimaryButton: {
+    backgroundColor: "#6d28d9",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+
+  debriefPrimaryButtonText: {
+    color: "#ffffff",
+    fontWeight: "800",
+  },
 });

@@ -3,15 +3,17 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
+  ScrollView,
   Text,
   TextInput,
   View,
   Image
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Audio } from "expo-av";
 import { VideoView, useVideoPlayer } from "expo-video";
@@ -165,6 +167,32 @@ type SubmissionResult = {
   missed_required_questions: string[];
   missed_red_flags: string[];
   critical_fails_triggered: string[];
+  clinicals2Debrief?: Clinicals2Debrief | null;
+};
+
+type Clinicals2AchievementResult = {
+  achievementId: string;
+  slug?: string | null;
+  title: string;
+  earnedPoints: number;
+  maxPoints: number;
+  percentScore?: number | null;
+  weightedScore?: number | null;
+  achieved: boolean;
+  feedback?: string | null;
+};
+
+type Clinicals2Debrief = {
+  sessionAttemptId: string;
+  sessionScore: number;
+  badgeTier: "GOLD" | "SILVER" | "BRONZE" | "NONE";
+  badgeLabel: string;
+  greeting?: string | null;
+  recognition: string;
+  coaching: string;
+  encouragement: string;
+  summary?: string | null;
+  achievementResults: Clinicals2AchievementResult[];
 };
 
 function statusColor(status: string) {
@@ -227,11 +255,50 @@ function normalizeSubmissionPayload(payload: any): SubmissionResult {
       : Array.isArray(details?.critical_fails_triggered)
       ? details.critical_fails_triggered
       : [],
+    clinicals2Debrief: payload?.clinicals2Debrief ?? details?.clinicals2Debrief ?? null,
+  };
+}
+
+function badgeTierFromScore(score: number) {
+  if (score >= 84) return "GOLD";
+  if (score >= 50) return "SILVER";
+  if (score > 0) return "BRONZE";
+  return "NONE";
+}
+
+function badgeLabelFromTier(tier?: string | null) {
+  if (!tier || tier === "NONE") return "No badge";
+  return tier.charAt(0) + tier.slice(1).toLowerCase();
+}
+
+function buildFallbackDebrief(result: SubmissionResult): Clinicals2Debrief {
+  const sessionScore = Number(result.score || 0);
+  const badgeTier = badgeTierFromScore(sessionScore) as Clinicals2Debrief["badgeTier"];
+  const feedback = String(result.feedback || "").trim();
+
+  return {
+    sessionAttemptId: "legacy-result",
+    sessionScore,
+    badgeTier,
+    badgeLabel: badgeLabelFromTier(badgeTier),
+    greeting:
+      badgeTier === "GOLD"
+        ? "Excellent work today. Review your report and take note of what contributed to your success. When you're ready, I'd be happy to discuss any part of it."
+        : "Thanks for completing the session. Review your report carefully, especially the areas marked for improvement. I'm here if you'd like to discuss them.",
+    recognition: `You completed the patient encounter and submitted your final HPI with a score of ${sessionScore}%.`,
+    coaching:
+      feedback ||
+      "Review the criterion breakdown below and focus your next attempt on the highest-impact missed or partially met items.",
+    encouragement:
+      "Keep going. Each focused encounter helps you sound more confident, organized, and patient-centered.",
+    summary: `Session score: ${sessionScore}%. Badge earned: ${badgeLabelFromTier(badgeTier)}.`,
+    achievementResults: [],
   };
 }
 
 export default function Level1Screen() {
   const params = useLocalSearchParams();
+  const router = useRouter();
   const caseId = useMemo(() => {
     const raw = params.caseId;
     return Array.isArray(raw) ? raw[0] : raw || "uti_level1";
@@ -260,6 +327,7 @@ export default function Level1Screen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null);
+  const [debriefVisible, setDebriefVisible] = useState(false);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [savedConversationId, setSavedConversationId] = useState<string | null>(null);
@@ -654,6 +722,7 @@ const { sound } = await Audio.Sound.createAsync(
     setStage("chat");
     setHpiText("");
     setSubmissionResult(null);
+    setDebriefVisible(false);
     setSubmitError(null);
     setSavedConversationId(null);
     setShowResumePrompt(false);
@@ -911,6 +980,7 @@ const { sound } = await Audio.Sound.createAsync(
       setSubmissionResult(normalizeSubmissionPayload(data));
       await deleteItemAsync(`conv_${caseId}`).catch(() => {});
       setStage("results");
+      setDebriefVisible(true);
     } catch (e: any) {
       const message = String(e?.message || "Failed to submit case.");
       const timedOut = message.toLowerCase().includes("timed out");
@@ -926,9 +996,11 @@ const { sound } = await Audio.Sound.createAsync(
               ...(conversationData.submission.details || {}),
               score: conversationData.submission.score,
               feedback: conversationData.submission.feedback,
+              clinicals2Debrief: conversationData.submission.clinicals2Debrief || null,
             };
             setSubmissionResult(normalizeSubmissionPayload(fromSavedSubmission));
             setStage("results");
+            setDebriefVisible(true);
             return;
           }
         } catch (checkErr) {
@@ -948,6 +1020,16 @@ const { sound } = await Audio.Sound.createAsync(
 
   const submitDisabled =
     submitting || creatingConversation || !conversationId || !hpiText.trim();
+
+  const visibleDebrief = useMemo(() => {
+    if (!submissionResult) return null;
+    return submissionResult.clinicals2Debrief || buildFallbackDebrief(submissionResult);
+  }, [submissionResult]);
+
+  const returnToRoadmap = useCallback(() => {
+    setDebriefVisible(false);
+    router.push("/(tabs)/cases");
+  }, [router]);
 
   const resumeConversation = useCallback(async () => {
     if (!savedConversationId) return;
@@ -994,6 +1076,7 @@ const { sound } = await Audio.Sound.createAsync(
     setHpiText("");
     setSubmitError(null);
     setSubmissionResult(null);
+    setDebriefVisible(false);
   }, [caseId, stopSpeechPlayback]);
 
   if (loadingCase) {
@@ -1051,6 +1134,83 @@ const { sound } = await Audio.Sound.createAsync(
           </View>
         </View>
       )}
+      <Modal
+        visible={debriefVisible && Boolean(visibleDebrief)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDebriefVisible(false)}
+      >
+        <View style={caseStyles.debriefOverlay}>
+          <View style={caseStyles.debriefCard}>
+            {visibleDebrief ? (
+              <ScrollView contentContainerStyle={caseStyles.debriefScrollContent}>
+                <View style={caseStyles.debriefHeaderRow}>
+                  <View style={caseStyles.debriefAvatarCircle}>
+                    <Text style={caseStyles.debriefAvatarText}>DM</Text>
+                  </View>
+                  <View style={caseStyles.debriefHeaderText}>
+                    <Text style={caseStyles.debriefEyebrow}>Dr. Martinez Debrief</Text>
+                    <Text style={caseStyles.debriefTitle}>Post-session coaching</Text>
+                  </View>
+                </View>
+
+                <View style={caseStyles.debriefMentorBubble}>
+                  <Text style={caseStyles.debriefMentorLabel}>Dr. Martinez</Text>
+                  <Text style={caseStyles.debriefText}>
+                    {visibleDebrief.greeting || visibleDebrief.recognition}
+                  </Text>
+                </View>
+
+                <View style={caseStyles.debriefScoreRow}>
+                  <View style={caseStyles.debriefMetricBox}>
+                    <Text style={caseStyles.debriefMetricLabel}>Session Score</Text>
+                    <Text style={caseStyles.debriefMetricValue}>{visibleDebrief.sessionScore}%</Text>
+                  </View>
+                  <View style={caseStyles.debriefMetricBox}>
+                    <Text style={caseStyles.debriefMetricLabel}>Badge Earned</Text>
+                    <Text style={caseStyles.debriefMetricValue}>{visibleDebrief.badgeLabel}</Text>
+                  </View>
+                </View>
+
+                {visibleDebrief.achievementResults.length > 0 ? (
+                  <View style={caseStyles.debriefSection}>
+                    <Text style={caseStyles.debriefSectionTitle}>Achievement Results</Text>
+                    {visibleDebrief.achievementResults.map((achievement) => (
+                      <View key={achievement.achievementId} style={caseStyles.debriefAchievementRow}>
+                        <View style={caseStyles.debriefAchievementMain}>
+                          <Text style={caseStyles.debriefAchievementTitle}>{achievement.title}</Text>
+                          {!!achievement.feedback && (
+                            <Text style={caseStyles.debriefAchievementFeedback}>
+                              {achievement.feedback}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={caseStyles.debriefAchievementScore}>
+                          {Math.round(Number(achievement.percentScore || 0))}%
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                <View style={caseStyles.debriefSection}>
+                  <Text style={caseStyles.debriefSectionTitle}>Encouragement</Text>
+                  <Text style={caseStyles.debriefText}>{visibleDebrief.encouragement}</Text>
+                </View>
+
+                <View style={caseStyles.debriefActions}>
+                  <Pressable onPress={() => setDebriefVisible(false)} style={caseStyles.debriefSecondaryButton}>
+                    <Text style={caseStyles.debriefSecondaryButtonText}>Review Results</Text>
+                  </Pressable>
+                  <Pressable onPress={returnToRoadmap} style={caseStyles.debriefPrimaryButton}>
+                    <Text style={caseStyles.debriefPrimaryButtonText}>Return to Roadmap</Text>
+                  </Pressable>
+                </View>
+              </ScrollView>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
       <KeyboardAvoidingView
         style={caseStyles.keyboardView}
         behavior={Platform.OS === "ios" ? "padding" : undefined}

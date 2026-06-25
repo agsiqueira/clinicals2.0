@@ -14,12 +14,13 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../../src/api/client";
 import { casesStyles } from "../../assets/styles/cases.styles";
-import { SessionCard } from "../../src/components/SessionCard";
+import { PatientAvatar } from "../../src/components/PatientAvatar";
 import {
   overviewEncounterTitle,
   overviewPatientName,
   overviewReasonForVisit,
   patientFacingText,
+  sessionDisplayParts,
   unitDisplayTitle,
 } from "../../src/utils/clinicalDisplay";
 
@@ -165,6 +166,58 @@ function badgeThresholdLabels(thresholds: SessionOverview["badgeThresholds"]) {
   };
 }
 
+function rotationTitle(unit: RoadmapUnit) {
+  return unitDisplayTitle(unit).replace(/^Unit\s+\d+\s*:\s*/i, "");
+}
+
+function rotationTheme(unit: RoadmapUnit) {
+  const order = Number(unit.sortOrder || 1);
+  const title = unitDisplayTitle(unit);
+
+  if (order === 2 || /seasonal|allerg/i.test(title)) {
+    return {
+      icon: "🌸",
+      description: "Practice focused history-taking for common outpatient symptoms.",
+      style: casesStyles.rotationCardSpring,
+      iconStyle: casesStyles.rotationIconSpring,
+    };
+  }
+
+  return {
+    icon: "🏥",
+    description:
+      "Practice professional introductions, rapport, and identifying the patient's main concern.",
+    style: casesStyles.rotationCardClinic,
+    iconStyle: casesStyles.rotationIconClinic,
+  };
+}
+
+function encounterStatusLabel(session: RoadmapSession) {
+  if (session.status === "locked") return "Locked";
+  if (session.status !== "completed") return "Available";
+  return null;
+}
+
+function encounterStatusStyle(session: RoadmapSession, isRetry = false) {
+  if (isRetry) return casesStyles.encounterStatusRetry;
+  if (session.status === "locked") return casesStyles.encounterStatusLocked;
+  return casesStyles.encounterStatusAvailable;
+}
+
+function rotationComplete(unit: RoadmapUnit) {
+  return unit.sessions.every(
+    (session) => session.status === "completed" && Number(session.bestSessionScore ?? -1) >= 84
+  );
+}
+
+function completedMasteryLabel(session: RoadmapSession) {
+  const score = session.bestSessionScore != null ? `${Math.round(Number(session.bestSessionScore))}%` : null;
+  if (session.badgeTier === "GOLD") return score ? `Gold · ${score}` : "Gold";
+  if (session.badgeTier === "SILVER") return score ? `Silver · ${score}` : "Silver";
+  if (session.badgeTier === "BRONZE") return score ? `Bronze · ${score}` : "Bronze";
+  return score ? `Complete · ${score}` : "Complete";
+}
+
 export default function HomeScreen() {
   const { signOut } = useClerk();
   const { userId: authUserId, sessionId } = useAuth();
@@ -191,6 +244,7 @@ export default function HomeScreen() {
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [overviewVisible, setOverviewVisible] = useState(false);
+  const [evaluationDetailsVisible, setEvaluationDetailsVisible] = useState(false);
   const [briefingVisible, setBriefingVisible] = useState(false);
   const [preceptorMessages, setPreceptorMessages] = useState<PreceptorChatMessage[]>([]);
   const [preceptorInput, setPreceptorInput] = useState("");
@@ -286,6 +340,7 @@ export default function HomeScreen() {
     setOverviewLoading(true);
     setOverviewError(null);
     setSelectedOverview(null);
+    setEvaluationDetailsVisible(false);
 
     try {
       const data = await api.getPatientSessionOverview(session.slug, userHeaders);
@@ -329,6 +384,17 @@ export default function HomeScreen() {
     setPreceptorInput("");
     setPreceptorError(null);
     setBriefingVisible(true);
+  };
+
+  const briefMissionText = (overview: SessionOverview) => {
+    const requiresHpi = Boolean(overview.workflow?.requiresHpi ?? overview.requiresHpi);
+    if (requiresHpi) {
+      return "Complete a focused clinical encounter and submit a concise history summary.";
+    }
+    if (overview.requiresHpi === false || overview.workflow?.requiresHpi === false) {
+      return "Begin the encounter professionally, build rapport, and identify the patient’s main concern.";
+    }
+    return patientFacingText(overview.description) || "Prepare for a focused patient encounter.";
   };
 
   const sendPreceptorMessage = async (messageOverride?: string) => {
@@ -420,8 +486,8 @@ export default function HomeScreen() {
         )}
 
         <View style={casesStyles.sectionHeader}>
-          <Text style={casesStyles.casesTitle}>Learning Roadmap</Text>
-          <Text style={casesStyles.casesSubText}>Progress through patient sessions one encounter at a time.</Text>
+          <Text style={casesStyles.casesTitle}>Roadmap</Text>
+          <Text style={casesStyles.casesSubText}>Follow your clinical journey.</Text>
         </View>
 
         {loadingRoadmap ? (
@@ -443,25 +509,154 @@ export default function HomeScreen() {
               <View style={casesStyles.pathHeader}>
                 <Text style={casesStyles.pathTitle}>{path.title}</Text>
               </View>
-              {!!path.description && <Text style={casesStyles.pathDescription}>{path.description}</Text>}
 
-              {path.units.map((unit) => (
-                <View key={unit.id} style={casesStyles.unitBlock}>
-                  <Text style={casesStyles.unitTitle}>{unitDisplayTitle(unit)}</Text>
-                  {!!unit.objective && <Text style={casesStyles.unitObjective}>{unit.objective}</Text>}
+              {path.units.map((unit, unitIndex) => {
+                const theme = rotationTheme(unit);
+                const isRotationComplete = rotationComplete(unit);
+                const isLastRotation = unitIndex === path.units.length - 1;
 
-                  <View style={casesStyles.sessionNodeList}>
-                    {unit.sessions.map((session) => (
-                      <SessionCard
-                        key={session.id}
-                        session={session}
-                        metaValue={session.bestSessionScore != null ? `${session.bestSessionScore}%` : null}
-                        onPress={() => openSessionOverview(session)}
-                      />
-                    ))}
+                return (
+                  <View key={unit.id}>
+                    <View style={[casesStyles.rotationCard, theme.style]}>
+                      <View style={casesStyles.rotationHeader}>
+                        <View style={[casesStyles.rotationIcon, theme.iconStyle]}>
+                          <Text style={casesStyles.rotationIconText}>{theme.icon}</Text>
+                        </View>
+                        <View style={casesStyles.rotationHeaderText}>
+                          <Text style={casesStyles.rotationEyebrow}>
+                            Rotation {Number(unit.sortOrder || 1)}
+                          </Text>
+                          <Text style={casesStyles.rotationTitle}>{rotationTitle(unit)}</Text>
+                          <Text style={casesStyles.rotationDescription}>
+                            {theme.description}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={casesStyles.pathRail}>
+                        {unit.sessions.map((session, index) => {
+                          const display = sessionDisplayParts(session);
+                          const isLocked = session.status === "locked";
+                          const isCompleted = session.status === "completed";
+                          const isLast = index === unit.sessions.length - 1;
+                          const roundedScore =
+                            isCompleted && session.bestSessionScore != null
+                              ? `${Math.round(Number(session.bestSessionScore))}%`
+                              : null;
+                          const nextSessionLocked = unit.sessions[index + 1]?.status === "locked";
+                          const shouldRetry =
+                            isCompleted &&
+                            nextSessionLocked &&
+                            (Number(session.bestSessionScore ?? 0) < 84 ||
+                              session.badgeTier === "BRONZE" ||
+                              session.badgeTier === "SILVER");
+                          const chipLabel = shouldRetry
+                            ? "Retry"
+                            : isCompleted
+                              ? completedMasteryLabel(session)
+                              : encounterStatusLabel(session);
+                          const badgeOverlay =
+                            session.badgeTier === "GOLD"
+                              ? "🥇"
+                              : session.badgeTier === "SILVER"
+                                ? "🥈"
+                                : session.badgeTier === "BRONZE"
+                                  ? "🥉"
+                                  : null;
+
+                          return (
+                            <View key={session.id} style={casesStyles.encounterCardStack}>
+                              <Pressable
+                                disabled={isLocked}
+                                onPress={() => openSessionOverview(session)}
+                                style={({ pressed }) => [
+                                  casesStyles.encounterNodeCard,
+                                  isLocked && casesStyles.encounterNodeCardLocked,
+                                  isCompleted && casesStyles.encounterNodeCardCompleted,
+                                  pressed && !isLocked && casesStyles.roadmapNodePressed,
+                                ]}
+                              >
+                                <View style={casesStyles.patientAvatarWrap}>
+                                  <PatientAvatar
+                                    patientName={display.patientName}
+                                    patientSessionSlug={session.slug}
+                                    size={56}
+                                    status={session.status}
+                                    tier={session.badgeTier}
+                                  />
+                                  {!!badgeOverlay && (
+                                    <Text style={casesStyles.patientNodeBadge}>{badgeOverlay}</Text>
+                                  )}
+                                </View>
+
+                                <Text
+                                  style={[
+                                    casesStyles.encounterPatientName,
+                                    isLocked && casesStyles.encounterTextLocked,
+                                  ]}
+                                >
+                                  {display.patientName}
+                                </Text>
+                                {!!display.taskTitle && (
+                                  <Text
+                                    style={[
+                                      casesStyles.encounterTask,
+                                      isLocked && casesStyles.encounterTextLocked,
+                                    ]}
+                                  >
+                                    {display.taskTitle}
+                                  </Text>
+                                )}
+
+                                {!!chipLabel && (
+                                  <Text
+                                    style={[
+                                      casesStyles.encounterStatus,
+                                      isCompleted
+                                        ? casesStyles.encounterStatusMastered
+                                        : encounterStatusStyle(session, shouldRetry),
+                                    ]}
+                                  >
+                                    {chipLabel}
+                                  </Text>
+                                )}
+                                {!!roundedScore && shouldRetry ? (
+                                  <Text style={casesStyles.encounterScore}>{roundedScore}</Text>
+                                ) : null}
+                              </Pressable>
+                              {!isLast && <View style={casesStyles.connectorLine} />}
+                            </View>
+                          );
+                        })}
+                      </View>
+
+                      <View
+                        style={[
+                          casesStyles.rotationMilestone,
+                          isRotationComplete
+                            ? casesStyles.rotationMilestoneComplete
+                            : casesStyles.rotationMilestoneUpcoming,
+                        ]}
+                      >
+                        <Text style={casesStyles.rotationMilestoneIcon}>
+                          {isRotationComplete ? "🏁" : "📜"}
+                        </Text>
+                        <View style={casesStyles.rotationMilestoneText}>
+                          <Text style={casesStyles.rotationMilestoneTitle}>
+                            {isRotationComplete ? "Rotation Complete" : "Clinical Milestone"}
+                          </Text>
+                          <Text style={casesStyles.rotationMilestoneBody}>
+                            {isRotationComplete
+                              ? "You've reached this clinical checkpoint."
+                              : "Complete each encounter with 84% or higher to reach this checkpoint."}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                    {!isLastRotation && <View style={casesStyles.rotationContinuationCue} />}
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           ))
         )}
@@ -498,56 +693,98 @@ export default function HomeScreen() {
 
                   return (
                     <>
-                      <Text style={casesStyles.modalTitle}>{overviewPatientName(selectedOverview)}</Text>
+                      <Text style={casesStyles.patientBriefLabel}>Patient Brief</Text>
+                      <View style={casesStyles.patientBriefHeader}>
+                        <PatientAvatar
+                          patientName={overviewPatientName(selectedOverview)}
+                          patientSessionSlug={selectedOverview.slug}
+                          caseId={selectedOverview.linkedCase?.caseId}
+                          size={58}
+                          status="available"
+                        />
+                        <View style={casesStyles.patientBriefHeaderText}>
+                          <Text style={casesStyles.modalTitle}>{overviewPatientName(selectedOverview)}</Text>
+                        </View>
+                      </View>
                       <Text style={casesStyles.modalEncounterTitle}>
                         {overviewEncounterTitle(selectedOverview)}
                       </Text>
                       {!!reasonForVisit && (
-                        <Text style={casesStyles.modalReason}>
-                          Reason for Visit: {reasonForVisit}
-                        </Text>
-                      )}
-                      {!!selectedOverview.description && (
-                        <Text style={casesStyles.modalDescription}>
-                          {patientFacingText(selectedOverview.description)}
-                        </Text>
+                        <View style={casesStyles.briefInfoBlock}>
+                          <Text style={casesStyles.briefSectionLabel}>Reason for Visit</Text>
+                          <Text style={casesStyles.briefSectionText}>{reasonForVisit}</Text>
+                        </View>
                       )}
 
-                      <View style={casesStyles.modalSection}>
-                        <Text style={casesStyles.modalSectionTitle}>{"How You'll Be Evaluated"}</Text>
-                        {selectedOverview.achievements.map((achievement, index) => (
-                          <View key={achievement.id} style={casesStyles.achievementRow}>
-                            <Text style={casesStyles.achievementTitle}>✓ {achievement.title}</Text>
-                            {!!weightLabels[index] && (
-                              <Text style={casesStyles.achievementWeight}>
-                                Worth {weightLabels[index]} of your session score
-                              </Text>
-                            )}
-                          </View>
-                        ))}
+                      <View style={casesStyles.briefInfoBlock}>
+                        <Text style={casesStyles.briefSectionLabel}>Your Mission</Text>
+                        <Text style={casesStyles.briefMissionText}>
+                          {briefMissionText(selectedOverview)}
+                        </Text>
                       </View>
 
                       <View style={casesStyles.modalSection}>
-                        <Text style={casesStyles.modalSectionTitle}>Performance Levels</Text>
-                        <View style={casesStyles.thresholdGrid}>
-                          <View style={casesStyles.thresholdCellGold}>
-                            <Text style={casesStyles.thresholdLabel}>🥇 Gold</Text>
-                            <Text style={casesStyles.thresholdValue}>{thresholdLabels.gold}</Text>
+                        <Text style={casesStyles.modalSectionTitle}>Today’s Focus</Text>
+                        {selectedOverview.achievements.map((achievement) => (
+                          <View key={achievement.id} style={casesStyles.focusRow}>
+                            <Text style={casesStyles.focusCheck}>✓</Text>
+                            <Text style={casesStyles.focusText}>{achievement.title}</Text>
                           </View>
-                          <View style={casesStyles.thresholdCellSilver}>
-                            <Text style={casesStyles.thresholdLabel}>🥈 Silver</Text>
-                            <Text style={casesStyles.thresholdValue}>{thresholdLabels.silver}</Text>
-                          </View>
-                          <View style={casesStyles.thresholdCellBronze}>
-                            <Text style={casesStyles.thresholdLabel}>🥉 Bronze</Text>
-                            <Text style={casesStyles.thresholdValue}>{thresholdLabels.bronze}</Text>
-                          </View>
-                        </View>
+                        ))}
                       </View>
 
                       <Text style={casesStyles.estimatedTimeText}>
                         Estimated time: {selectedOverview.estimatedTime.min || 3}-{selectedOverview.estimatedTime.max || 5} minutes
                       </Text>
+
+                      <Text style={casesStyles.preceptorCueText}>
+                        Next: Meet with Dr. Martinez before entering the encounter.
+                      </Text>
+
+                      <Pressable
+                        onPress={() => setEvaluationDetailsVisible((visible) => !visible)}
+                        style={casesStyles.evaluationToggle}
+                      >
+                        <Text style={casesStyles.evaluationToggleText}>
+                          {evaluationDetailsVisible ? "Hide evaluation details" : "Show evaluation details"}
+                        </Text>
+                      </Pressable>
+
+                      {evaluationDetailsVisible ? (
+                        <>
+                          <View style={casesStyles.modalSection}>
+                            <Text style={casesStyles.modalSectionTitle}>{"How You'll Be Evaluated"}</Text>
+                            {selectedOverview.achievements.map((achievement, index) => (
+                              <View key={achievement.id} style={casesStyles.achievementRow}>
+                                <Text style={casesStyles.achievementTitle}>✓ {achievement.title}</Text>
+                                {!!weightLabels[index] && (
+                                  <Text style={casesStyles.achievementWeight}>
+                                    Worth {weightLabels[index]} of your session score
+                                  </Text>
+                                )}
+                              </View>
+                            ))}
+                          </View>
+
+                          <View style={casesStyles.modalSection}>
+                            <Text style={casesStyles.modalSectionTitle}>Performance Levels</Text>
+                            <View style={casesStyles.thresholdGrid}>
+                              <View style={casesStyles.thresholdCellGold}>
+                                <Text style={casesStyles.thresholdLabel}>🥇 Gold</Text>
+                                <Text style={casesStyles.thresholdValue}>{thresholdLabels.gold}</Text>
+                              </View>
+                              <View style={casesStyles.thresholdCellSilver}>
+                                <Text style={casesStyles.thresholdLabel}>🥈 Silver</Text>
+                                <Text style={casesStyles.thresholdValue}>{thresholdLabels.silver}</Text>
+                              </View>
+                              <View style={casesStyles.thresholdCellBronze}>
+                                <Text style={casesStyles.thresholdLabel}>🥉 Bronze</Text>
+                                <Text style={casesStyles.thresholdValue}>{thresholdLabels.bronze}</Text>
+                              </View>
+                            </View>
+                          </View>
+                        </>
+                      ) : null}
 
                       <View style={casesStyles.modalActions}>
                         <Pressable onPress={() => setOverviewVisible(false)} style={casesStyles.modalSecondaryButton}>

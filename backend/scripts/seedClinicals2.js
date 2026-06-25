@@ -3,6 +3,9 @@ const dotenv = require("dotenv");
 const prisma = require("../src/db/prisma");
 const { syncAllCases } = require("../src/utils/caseSync");
 const { loadGrading } = require("../src/utils/caseLoader");
+const {
+  seedMotivationalAchievementDefinitions,
+} = require("../src/services/motivationalAchievements");
 
 dotenv.config();
 
@@ -408,6 +411,11 @@ async function seedClinicals2() {
     requiredForCompletion: true,
     sortOrder: 3,
   });
+
+  const motivationalAchievements = await seedMotivationalAchievementDefinitions();
+  console.log(
+    `[seed] Seeded ${motivationalAchievements.length} motivational achievement definition(s).`
+  );
 
   console.log("[seed] Clinicals 2.0 Phase 2 seed complete.");
 }

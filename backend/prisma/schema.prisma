@@ -66,6 +66,7 @@ model User {
   mentorAssessments MentorAssessment[]
   preceptorMessages PreceptorMessage[]
   readinessResults  OptionalProfessionalReadinessResult[]
+  userAchievements  UserMotivationalAchievement[]
 }
 
 model Case {
@@ -365,6 +366,44 @@ model Streak {
   updatedAt        DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model MotivationalAchievement {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  description String?
+  category    String
+  icon        String?
+  xpReward    Int      @default(0)
+  targetValue Int?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  criteria    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  userAchievements UserMotivationalAchievement[]
+}
+
+model UserMotivationalAchievement {
+  id                        String    @id @default(uuid())
+  userId                    String
+  motivationalAchievementId String
+  status                    String    @default("LOCKED")
+  currentValue              Int       @default(0)
+  targetValue               Int?
+  earnedAt                  DateTime?
+  lastEvaluatedAt           DateTime  @default(now())
+  metadata                  Json?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  user                    User                    @relation(fields: [userId], references: [id])
+  motivationalAchievement MotivationalAchievement @relation(fields: [motivationalAchievementId], references: [id])
+
+  @@unique([userId, motivationalAchievementId])
+  @@index([userId])
 }
 
 model MentorAssessment {

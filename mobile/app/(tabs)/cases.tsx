@@ -50,6 +50,7 @@ type RoadmapUnit = {
   slug: string;
   title: string;
   objective?: string | null;
+  sortOrder?: number | null;
   sessions: RoadmapSession[];
 };
 
@@ -113,6 +114,18 @@ const PRECEPTOR_QUICK_ACTIONS = [
   "What should I focus on?",
 ];
 
+const ROADMAP_SESSION_PATIENT_NAMES: Record<string, string> = {
+  "first-patient": "Taylor Reed",
+  "first-patient-hpi": "Taylor Reed",
+  "seasonal-allergies-complete-hpi": "Sarah Johnson",
+};
+
+const ROADMAP_SESSION_REASONS: Record<string, string> = {
+  "first-patient": "Urinary Symptoms",
+  "first-patient-hpi": "Urinary Symptoms",
+  "seasonal-allergies-complete-hpi": "Seasonal Allergies",
+};
+
 function normalizeLearningPathsResponse(data: any): LearningPath[] {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.learningPaths)) return data.learningPaths;
@@ -123,7 +136,93 @@ function normalizeLearningPathsResponse(data: any): LearningPath[] {
 function badgeLabel(session: RoadmapSession) {
   if (session.status !== "completed") return null;
   if (!session.badgeTier || session.badgeTier === "NONE") return "Completed";
+  if (session.badgeTier === "GOLD") return "🥇 Gold";
+  if (session.badgeTier === "SILVER") return "🥈 Silver";
+  if (session.badgeTier === "BRONZE") return "🥉 Bronze";
   return session.badgeTier.charAt(0) + session.badgeTier.slice(1).toLowerCase();
+}
+
+function unitDisplayTitle(unit: RoadmapUnit) {
+  const title = String(unit.title || "").trim();
+  if (unit.slug === "unit-1-clinical-encounter") return "Unit 1: First Clinical Encounter";
+  if (/^Unit\s+\d+\s*:/i.test(title)) return title;
+
+  const sortOrder = Number(unit.sortOrder);
+  if (Number.isFinite(sortOrder) && sortOrder > 0) {
+    return `Unit ${sortOrder}: ${title}`;
+  }
+
+  return title;
+}
+
+function sessionDisplayTitle(session: RoadmapSession) {
+  const patientName = ROADMAP_SESSION_PATIENT_NAMES[session.slug];
+  const title = String(session.title || "").replace(/Complete HPI/gi, "Complete Clinical Encounter");
+
+  if (!patientName) return title;
+  if (/Introduction and Chief Complaint/i.test(title)) {
+    return `${patientName}: Introduction & Chief Complaint`;
+  }
+  if (/Complete Clinical Encounter/i.test(title)) {
+    return `${patientName}: Complete Clinical Encounter`;
+  }
+
+  return title.replace(/^First Patient:\s*/i, `${patientName}: `);
+}
+
+function patientFacingText(value?: string | null) {
+  return String(value || "")
+    .replace(/Complete HPI/gi, "Complete Clinical Encounter")
+    .replace(/HPI\b/g, "focused history");
+}
+
+function overviewPatientName(overview: SessionOverview) {
+  return ROADMAP_SESSION_PATIENT_NAMES[overview.slug] || "Patient";
+}
+
+function overviewEncounterTitle(overview: SessionOverview) {
+  const title = patientFacingText(overview.title);
+  if (/Introduction and Chief Complaint/i.test(title)) return "Introduction & Chief Complaint";
+  if (/Complete Clinical Encounter/i.test(title)) return "Complete Clinical Encounter";
+  return title
+    .replace(/^First Patient:\s*/i, "")
+    .replace(/^Seasonal Allergies:\s*/i, "");
+}
+
+function overviewReasonForVisit(overview: SessionOverview) {
+  const mappedReason = ROADMAP_SESSION_REASONS[overview.slug];
+  if (mappedReason) return mappedReason;
+
+  const caseTitle = overview.linkedCase?.title?.trim();
+  if (!caseTitle || /^Level\s+\d/i.test(caseTitle)) return null;
+  return patientFacingText(caseTitle);
+}
+
+function achievementWeightLabels(achievements: AchievementSummary[]) {
+  const numericWeights = achievements.map((achievement) => Number(achievement.weightPercent));
+  const allWeightsValid = numericWeights.every(Number.isFinite);
+  if (!allWeightsValid) return achievements.map(() => null);
+
+  const roundedWeights = numericWeights.map((weight) => Math.round(weight));
+  const rawTotal = numericWeights.reduce((sum, weight) => sum + weight, 0);
+  if (roundedWeights.length > 1 && Math.round(rawTotal) === 100) {
+    const priorTotal = roundedWeights.slice(0, -1).reduce((sum, weight) => sum + weight, 0);
+    roundedWeights[roundedWeights.length - 1] = 100 - priorTotal;
+  }
+
+  return roundedWeights.map((weight) => `${weight}%`);
+}
+
+function badgeThresholdLabels(thresholds: SessionOverview["badgeThresholds"]) {
+  const gold = Math.round(thresholds.gold);
+  const silver = Math.round(thresholds.silver);
+  const bronze = Math.round(thresholds.bronze);
+
+  return {
+    gold: `${gold}%+`,
+    silver: `${silver}–${gold - 1}%`,
+    bronze: `${bronze}–${silver - 1}%`,
+  };
 }
 
 function nodeStyleFor(session: RoadmapSession) {
@@ -393,16 +492,12 @@ export default function HomeScreen() {
             <View key={path.id} style={casesStyles.roadmapPath}>
               <View style={casesStyles.pathHeader}>
                 <Text style={casesStyles.pathTitle}>{path.title}</Text>
-                {!!path.preceptorPersona?.name && (
-                  <Text style={casesStyles.pathPreceptor}>{path.preceptorPersona.name}</Text>
-                )}
               </View>
               {!!path.description && <Text style={casesStyles.pathDescription}>{path.description}</Text>}
 
               {path.units.map((unit) => (
                 <View key={unit.id} style={casesStyles.unitBlock}>
-                  <Text style={casesStyles.unitLabel}>Current Unit</Text>
-                  <Text style={casesStyles.unitTitle}>{unit.title}</Text>
+                  <Text style={casesStyles.unitTitle}>{unitDisplayTitle(unit)}</Text>
                   {!!unit.objective && <Text style={casesStyles.unitObjective}>{unit.objective}</Text>}
 
                   <View style={casesStyles.sessionNodeList}>
@@ -421,7 +516,7 @@ export default function HomeScreen() {
                         >
                           <View style={casesStyles.nodeMain}>
                             <Text style={[casesStyles.roadmapNodeTitle, nodeTextStyleFor(session)]}>
-                              {session.title}
+                              {sessionDisplayTitle(session)}
                             </Text>
                             {!!session.objective && (
                               <Text style={casesStyles.roadmapNodeObjective} numberOfLines={2}>
@@ -472,53 +567,75 @@ export default function HomeScreen() {
               </View>
             ) : selectedOverview ? (
               <ScrollView contentContainerStyle={casesStyles.modalContent}>
-                <Text style={casesStyles.modalTitle}>{selectedOverview.title}</Text>
-                {!!selectedOverview.objective && (
-                  <Text style={casesStyles.modalObjective}>{selectedOverview.objective}</Text>
-                )}
-                {!!selectedOverview.description && (
-                  <Text style={casesStyles.modalDescription}>{selectedOverview.description}</Text>
-                )}
+                {(() => {
+                  const weightLabels = achievementWeightLabels(selectedOverview.achievements);
+                  const thresholdLabels = badgeThresholdLabels(selectedOverview.badgeThresholds);
+                  const reasonForVisit = overviewReasonForVisit(selectedOverview);
 
-                <View style={casesStyles.modalSection}>
-                  <Text style={casesStyles.modalSectionTitle}>Main Achievements</Text>
-                  {selectedOverview.achievements.map((achievement) => (
-                    <View key={achievement.id} style={casesStyles.achievementRow}>
-                      <Text style={casesStyles.achievementTitle}>{achievement.title}</Text>
-                      {achievement.weightPercent != null && (
-                        <Text style={casesStyles.achievementWeight}>{achievement.weightPercent}%</Text>
+                  return (
+                    <>
+                      <Text style={casesStyles.modalTitle}>{overviewPatientName(selectedOverview)}</Text>
+                      <Text style={casesStyles.modalEncounterTitle}>
+                        {overviewEncounterTitle(selectedOverview)}
+                      </Text>
+                      {!!reasonForVisit && (
+                        <Text style={casesStyles.modalReason}>
+                          Reason for Visit: {reasonForVisit}
+                        </Text>
                       )}
-                    </View>
-                  ))}
-                </View>
+                      {!!selectedOverview.description && (
+                        <Text style={casesStyles.modalDescription}>
+                          {patientFacingText(selectedOverview.description)}
+                        </Text>
+                      )}
 
-                <View style={casesStyles.thresholdGrid}>
-                  <View style={casesStyles.thresholdCellGold}>
-                    <Text style={casesStyles.thresholdLabel}>Gold</Text>
-                    <Text style={casesStyles.thresholdValue}>&gt;= {selectedOverview.badgeThresholds.gold}%</Text>
-                  </View>
-                  <View style={casesStyles.thresholdCellSilver}>
-                    <Text style={casesStyles.thresholdLabel}>Silver</Text>
-                    <Text style={casesStyles.thresholdValue}>&gt;= {selectedOverview.badgeThresholds.silver}%</Text>
-                  </View>
-                  <View style={casesStyles.thresholdCellBronze}>
-                    <Text style={casesStyles.thresholdLabel}>Bronze</Text>
-                    <Text style={casesStyles.thresholdValue}>&gt; 0%</Text>
-                  </View>
-                </View>
+                      <View style={casesStyles.modalSection}>
+                        <Text style={casesStyles.modalSectionTitle}>{"How You'll Be Evaluated"}</Text>
+                        {selectedOverview.achievements.map((achievement, index) => (
+                          <View key={achievement.id} style={casesStyles.achievementRow}>
+                            <Text style={casesStyles.achievementTitle}>✓ {achievement.title}</Text>
+                            {!!weightLabels[index] && (
+                              <Text style={casesStyles.achievementWeight}>
+                                Worth {weightLabels[index]} of your session score
+                              </Text>
+                            )}
+                          </View>
+                        ))}
+                      </View>
 
-                <Text style={casesStyles.estimatedTimeText}>
-                  Estimated time: {selectedOverview.estimatedTime.min || 3}-{selectedOverview.estimatedTime.max || 5} minutes
-                </Text>
+                      <View style={casesStyles.modalSection}>
+                        <Text style={casesStyles.modalSectionTitle}>Performance Levels</Text>
+                        <View style={casesStyles.thresholdGrid}>
+                          <View style={casesStyles.thresholdCellGold}>
+                            <Text style={casesStyles.thresholdLabel}>🥇 Gold</Text>
+                            <Text style={casesStyles.thresholdValue}>{thresholdLabels.gold}</Text>
+                          </View>
+                          <View style={casesStyles.thresholdCellSilver}>
+                            <Text style={casesStyles.thresholdLabel}>🥈 Silver</Text>
+                            <Text style={casesStyles.thresholdValue}>{thresholdLabels.silver}</Text>
+                          </View>
+                          <View style={casesStyles.thresholdCellBronze}>
+                            <Text style={casesStyles.thresholdLabel}>🥉 Bronze</Text>
+                            <Text style={casesStyles.thresholdValue}>{thresholdLabels.bronze}</Text>
+                          </View>
+                        </View>
+                      </View>
 
-                <View style={casesStyles.modalActions}>
-                  <Pressable onPress={() => setOverviewVisible(false)} style={casesStyles.modalSecondaryButton}>
-                    <Text style={casesStyles.modalSecondaryButtonText}>Close</Text>
-                  </Pressable>
-                  <Pressable onPress={startSelectedSession} style={casesStyles.modalPrimaryButton}>
-                    <Text style={casesStyles.modalPrimaryButtonText}>Meet Preceptor</Text>
-                  </Pressable>
-                </View>
+                      <Text style={casesStyles.estimatedTimeText}>
+                        Estimated time: {selectedOverview.estimatedTime.min || 3}-{selectedOverview.estimatedTime.max || 5} minutes
+                      </Text>
+
+                      <View style={casesStyles.modalActions}>
+                        <Pressable onPress={() => setOverviewVisible(false)} style={casesStyles.modalSecondaryButton}>
+                          <Text style={casesStyles.modalSecondaryButtonText}>Close</Text>
+                        </Pressable>
+                        <Pressable onPress={startSelectedSession} style={casesStyles.modalPrimaryButton}>
+                          <Text style={casesStyles.modalPrimaryButtonText}>Meet Preceptor</Text>
+                        </Pressable>
+                      </View>
+                    </>
+                  );
+                })()}
               </ScrollView>
             ) : null}
           </View>

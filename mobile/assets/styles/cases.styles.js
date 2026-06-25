@@ -316,6 +316,17 @@ export const casesStyles = StyleSheet.create({
     fontWeight: "800",
     color: "#111827",
   },
+  modalEncounterTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#4c1d95",
+    lineHeight: 24,
+  },
+  modalReason: {
+    color: "#6b7280",
+    fontWeight: "700",
+    lineHeight: 20,
+  },
   modalObjective: {
     fontSize: 15,
     fontWeight: "700",
@@ -341,18 +352,16 @@ export const casesStyles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 10,
+    gap: 4,
   },
   achievementTitle: {
-    flex: 1,
     fontWeight: "700",
     color: "#111827",
   },
   achievementWeight: {
-    color: "#6d28d9",
-    fontWeight: "800",
+    color: "#6b7280",
+    fontWeight: "600",
+    lineHeight: 19,
   },
   thresholdGrid: {
     flexDirection: "row",

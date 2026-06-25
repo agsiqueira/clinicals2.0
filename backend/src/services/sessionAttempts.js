@@ -4,6 +4,9 @@ const {
   computeSessionScore,
   determineBadgeTier,
 } = require("../utils/achievementScoring");
+const {
+  evaluateMotivationalAchievementsForSessionAttempt,
+} = require("./motivationalAchievements");
 
 async function resolvePatientSessionForAttempt({
   caseRecordId,
@@ -372,11 +375,17 @@ async function finalizeSessionAttemptFromSubmission({ sessionAttemptId, submissi
     }),
   ]);
 
+  const motivationalAchievements = await evaluateMotivationalAchievementsForSessionAttempt({
+    userId: sessionAttempt.userId,
+    sessionAttemptId,
+  });
+
   return {
     sessionAttemptId,
     sessionScore,
     badgeTier,
     achievementResults,
+    motivationalAchievements,
     debrief: buildSessionDebriefPayload({
       sessionAttemptId,
       sessionScore,

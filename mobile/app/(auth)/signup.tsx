@@ -28,7 +28,7 @@ export default function SignupScreen() {
 
     useEffect(() => {
         if (!authLoaded) return;
-        if (isSignedIn) router.replace("/(tabs)/cases");
+        if (isSignedIn) router.replace("/(tabs)");
     }, [authLoaded, isSignedIn, router]);
 
     if (!authLoaded || isSignedIn) {
@@ -75,7 +75,7 @@ export default function SignupScreen() {
             }
 
             await setActive({ session: result.createdSessionId });
-            router.replace("/(tabs)/cases");
+            router.replace("/(tabs)");
         } catch (err: any) {
             const msg =
                 err?.errors?.[0]?.longMessage ||

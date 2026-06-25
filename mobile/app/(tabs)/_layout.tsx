@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React from 'react';
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -16,19 +17,25 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Today',
           tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
         }}
       />
       <Tabs.Screen
         name="cases"
         options={{
-          title: 'Cases',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="stethoscope" color={color} />,
+          title: 'Roadmap',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="map-marker-path" size={size} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="level1"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="level1 - original"
         options={{ href: null }}
       />
     </Tabs>

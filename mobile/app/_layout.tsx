@@ -40,16 +40,16 @@ export default function RootLayout() {
           </ClerkLoading>
           <ClerkLoaded>
             <SignedIn>
-              <Stack>
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
-                <Stack.Screen name="attempt-result" options={{ headerShown: false }} />
-                <Stack.Screen name="attempts" options={{ headerShown: false }} />
+                <Stack.Screen name="attempt-result" />
+                <Stack.Screen name="attempts" />
               </Stack>
             </SignedIn>
             <SignedOut>
-              <Stack>
-                <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="(auth)" />
               </Stack>
             </SignedOut>
           </ClerkLoaded>

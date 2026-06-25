@@ -28,7 +28,7 @@ export default function SigninScreen() {
     // if already signed in
     useEffect(() => {
         if (!authLoaded) return;
-        if (isSignedIn) router.replace("/(tabs)/cases");
+        if (isSignedIn) router.replace("/(tabs)");
     }, [authLoaded, isSignedIn, router]);
 
     // while Clerk is loading or redirecting
@@ -64,7 +64,7 @@ export default function SigninScreen() {
             }
 
             await setActive({ session: result.createdSessionId });
-            router.replace("/(tabs)/cases");
+            router.replace("/(tabs)");
         } catch (err: any) {
             const msg =
                 err?.errors?.[0]?.longMessage ||

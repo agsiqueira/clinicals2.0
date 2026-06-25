@@ -10,10 +10,18 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth, useClerk, useUser } from "@clerk/clerk-expo";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../../src/api/client";
 import { casesStyles } from "../../assets/styles/cases.styles";
+import { SessionCard } from "../../src/components/SessionCard";
+import {
+  overviewEncounterTitle,
+  overviewPatientName,
+  overviewReasonForVisit,
+  patientFacingText,
+  unitDisplayTitle,
+} from "../../src/utils/clinicalDisplay";
 
 type AchievementSummary = {
   id: string;
@@ -66,6 +74,15 @@ type LearningPath = {
   units: RoadmapUnit[];
 };
 
+type JourneySummary = {
+  professionalLevel?: number | null;
+  levelTitle?: string | null;
+  xp?: number | null;
+  streak?: {
+    currentCount?: number | null;
+  } | null;
+};
+
 type SessionOverview = {
   id: string;
   slug: string;
@@ -114,88 +131,11 @@ const PRECEPTOR_QUICK_ACTIONS = [
   "What should I focus on?",
 ];
 
-const ROADMAP_SESSION_PATIENT_NAMES: Record<string, string> = {
-  "first-patient": "Taylor Reed",
-  "first-patient-hpi": "Taylor Reed",
-  "seasonal-allergies-complete-hpi": "Sarah Johnson",
-};
-
-const ROADMAP_SESSION_REASONS: Record<string, string> = {
-  "first-patient": "Urinary Symptoms",
-  "first-patient-hpi": "Urinary Symptoms",
-  "seasonal-allergies-complete-hpi": "Seasonal Allergies",
-};
-
 function normalizeLearningPathsResponse(data: any): LearningPath[] {
   if (Array.isArray(data)) return data;
   if (Array.isArray(data?.learningPaths)) return data.learningPaths;
   if (data && typeof data === "object" && Array.isArray(data.units)) return [data];
   return [];
-}
-
-function badgeLabel(session: RoadmapSession) {
-  if (session.status !== "completed") return null;
-  if (!session.badgeTier || session.badgeTier === "NONE") return "Completed";
-  if (session.badgeTier === "GOLD") return "🥇 Gold";
-  if (session.badgeTier === "SILVER") return "🥈 Silver";
-  if (session.badgeTier === "BRONZE") return "🥉 Bronze";
-  return session.badgeTier.charAt(0) + session.badgeTier.slice(1).toLowerCase();
-}
-
-function unitDisplayTitle(unit: RoadmapUnit) {
-  const title = String(unit.title || "").trim();
-  if (unit.slug === "unit-1-clinical-encounter") return "Unit 1: First Clinical Encounter";
-  if (/^Unit\s+\d+\s*:/i.test(title)) return title;
-
-  const sortOrder = Number(unit.sortOrder);
-  if (Number.isFinite(sortOrder) && sortOrder > 0) {
-    return `Unit ${sortOrder}: ${title}`;
-  }
-
-  return title;
-}
-
-function sessionDisplayTitle(session: RoadmapSession) {
-  const patientName = ROADMAP_SESSION_PATIENT_NAMES[session.slug];
-  const title = String(session.title || "").replace(/Complete HPI/gi, "Complete Clinical Encounter");
-
-  if (!patientName) return title;
-  if (/Introduction and Chief Complaint/i.test(title)) {
-    return `${patientName}: Introduction & Chief Complaint`;
-  }
-  if (/Complete Clinical Encounter/i.test(title)) {
-    return `${patientName}: Complete Clinical Encounter`;
-  }
-
-  return title.replace(/^First Patient:\s*/i, `${patientName}: `);
-}
-
-function patientFacingText(value?: string | null) {
-  return String(value || "")
-    .replace(/Complete HPI/gi, "Complete Clinical Encounter")
-    .replace(/HPI\b/g, "focused history");
-}
-
-function overviewPatientName(overview: SessionOverview) {
-  return ROADMAP_SESSION_PATIENT_NAMES[overview.slug] || "Patient";
-}
-
-function overviewEncounterTitle(overview: SessionOverview) {
-  const title = patientFacingText(overview.title);
-  if (/Introduction and Chief Complaint/i.test(title)) return "Introduction & Chief Complaint";
-  if (/Complete Clinical Encounter/i.test(title)) return "Complete Clinical Encounter";
-  return title
-    .replace(/^First Patient:\s*/i, "")
-    .replace(/^Seasonal Allergies:\s*/i, "");
-}
-
-function overviewReasonForVisit(overview: SessionOverview) {
-  const mappedReason = ROADMAP_SESSION_REASONS[overview.slug];
-  if (mappedReason) return mappedReason;
-
-  const caseTitle = overview.linkedCase?.title?.trim();
-  if (!caseTitle || /^Level\s+\d/i.test(caseTitle)) return null;
-  return patientFacingText(caseTitle);
 }
 
 function achievementWeightLabels(achievements: AchievementSummary[]) {
@@ -225,35 +165,28 @@ function badgeThresholdLabels(thresholds: SessionOverview["badgeThresholds"]) {
   };
 }
 
-function nodeStyleFor(session: RoadmapSession) {
-  if (session.status === "locked") return casesStyles.roadmapNodeLocked;
-  if (session.status === "completed") {
-    if (session.badgeTier === "GOLD") return casesStyles.roadmapNodeGold;
-    if (session.badgeTier === "SILVER") return casesStyles.roadmapNodeSilver;
-    if (session.badgeTier === "BRONZE") return casesStyles.roadmapNodeBronze;
-    return casesStyles.roadmapNodeCompleted;
-  }
-  return casesStyles.roadmapNodeAvailable;
-}
-
-function nodeTextStyleFor(session: RoadmapSession) {
-  if (session.status === "locked") return casesStyles.roadmapNodeTextLocked;
-  if (session.status === "completed") return casesStyles.roadmapNodeTextCompleted;
-  return casesStyles.roadmapNodeTextAvailable;
-}
-
 export default function HomeScreen() {
   const { signOut } = useClerk();
-  const { userId: authUserId } = useAuth();
+  const { userId: authUserId, sessionId } = useAuth();
   const { user, isLoaded: userLoaded } = useUser();
   const router = useRouter();
+  const searchParams = useLocalSearchParams<{
+    focusSessionSlug?: string | string[];
+    focusSessionToken?: string | string[];
+  }>();
+  const rawFocusSessionSlug = searchParams.focusSessionSlug;
+  const rawFocusSessionToken = searchParams.focusSessionToken;
+  const focusSessionSlug = Array.isArray(rawFocusSessionSlug)
+    ? rawFocusSessionSlug[0]
+    : rawFocusSessionSlug;
+  const focusSessionToken = Array.isArray(rawFocusSessionToken)
+    ? rawFocusSessionToken[0]
+    : rawFocusSessionToken;
   const [signingOut, setSigningOut] = useState(false);
-  const [loadingProgress, setLoadingProgress] = useState(true);
   const [loadingRoadmap, setLoadingRoadmap] = useState(true);
   const [roadmapError, setRoadmapError] = useState<string | null>(null);
   const [learningPaths, setLearningPaths] = useState<LearningPath[]>([]);
-  const [points, setPoints] = useState(0);
-  const [level, setLevel] = useState(1);
+  const [journeySummary, setJourneySummary] = useState<JourneySummary | null>(null);
   const [selectedOverview, setSelectedOverview] = useState<SessionOverview | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewError, setOverviewError] = useState<string | null>(null);
@@ -263,6 +196,7 @@ export default function HomeScreen() {
   const [preceptorInput, setPreceptorInput] = useState("");
   const [preceptorSending, setPreceptorSending] = useState(false);
   const [preceptorError, setPreceptorError] = useState<string | null>(null);
+  const [autoOpenedSessionKey, setAutoOpenedSessionKey] = useState<string | null>(null);
 
   const userHeaders = useMemo(() => {
     const headers: Record<string, string> = {};
@@ -279,13 +213,14 @@ export default function HomeScreen() {
 
   const displayName = useMemo(() => {
     const info =
-      user?.username ||
       user?.firstName ||
-      user?.primaryEmailAddress?.emailAddress ||
-      user?.emailAddresses?.[0]?.emailAddress ||
-      "there";
+      user?.fullName?.split(/\s+/)[0] ||
+      user?.username ||
+      user?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+      user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ||
+      null;
 
-    return info.charAt(0).toUpperCase() + info.slice(1);
+    return info ? info.charAt(0).toUpperCase() + info.slice(1) : null;
   }, [user]);
 
   const loadRoadmap = useCallback(async () => {
@@ -296,6 +231,7 @@ export default function HomeScreen() {
 
     if (!userHeaders["x-clerk-user-id"]) {
       setLearningPaths([]);
+      setJourneySummary(null);
       setLoadingRoadmap(false);
       return;
     }
@@ -306,41 +242,25 @@ export default function HomeScreen() {
       const data = await api.getLearningPaths(userHeaders);
       const parsed = normalizeLearningPathsResponse(data);
       setLearningPaths(parsed);
+      try {
+        const todayData = await api.getToday(userHeaders);
+        setJourneySummary(todayData?.identity || null);
+      } catch {
+        setJourneySummary(null);
+      }
     } catch (err: any) {
       setRoadmapError(err?.message || "Failed to load learning roadmap.");
       setLearningPaths([]);
+      setJourneySummary(null);
     } finally {
       setLoadingRoadmap(false);
     }
   }, [userHeaders, userLoaded]);
 
-  const loadProgress = useCallback(async () => {
-    if (!userHeaders["x-clerk-user-id"]) {
-      setPoints(0);
-      setLevel(1);
-      setLoadingProgress(false);
-      return;
-    }
-
-    try {
-      setLoadingProgress(true);
-      const data = await api.getProgress(userHeaders);
-      setPoints(Number(data?.points ?? 0) || 0);
-      setLevel(Math.max(1, Number(data?.level ?? 1) || 1));
-    } catch (err) {
-      console.warn("Failed to load user progress:", err);
-      setPoints(0);
-      setLevel(1);
-    } finally {
-      setLoadingProgress(false);
-    }
-  }, [userHeaders]);
-
   useFocusEffect(
     useCallback(() => {
-      loadProgress();
       loadRoadmap();
-    }, [loadProgress, loadRoadmap])
+    }, [loadRoadmap])
   );
 
   useEffect(() => {
@@ -351,14 +271,15 @@ export default function HomeScreen() {
     if (signingOut) return;
     setSigningOut(true);
     try {
-      await signOut();
-      router.replace("/(auth)/signin");
-    } finally {
+      await signOut({ sessionId: sessionId || undefined, redirectUrl: "/signin" });
+      router.replace("/signin");
+    } catch (err) {
       setSigningOut(false);
+      throw err;
     }
   };
 
-  const openSessionOverview = async (session: RoadmapSession) => {
+  const openSessionOverview = useCallback(async (session: RoadmapSession) => {
     if (session.status === "locked") return;
 
     setOverviewVisible(true);
@@ -374,7 +295,33 @@ export default function HomeScreen() {
     } finally {
       setOverviewLoading(false);
     }
-  };
+  }, [userHeaders]);
+
+  useEffect(() => {
+    if (!focusSessionSlug || loadingRoadmap || overviewVisible || briefingVisible) return;
+
+    const focusKey = `${focusSessionSlug}:${focusSessionToken || ""}`;
+    if (autoOpenedSessionKey === focusKey) return;
+
+    const session = learningPaths
+      .flatMap((path) => path.units)
+      .flatMap((unit) => unit.sessions)
+      .find((candidate) => candidate.slug === focusSessionSlug);
+
+    if (!session || session.status === "locked") return;
+
+    setAutoOpenedSessionKey(focusKey);
+    openSessionOverview(session);
+  }, [
+    autoOpenedSessionKey,
+    briefingVisible,
+    focusSessionSlug,
+    focusSessionToken,
+    learningPaths,
+    loadingRoadmap,
+    openSessionOverview,
+    overviewVisible,
+  ]);
 
   const startSelectedSession = () => {
     setOverviewVisible(false);
@@ -437,11 +384,21 @@ export default function HomeScreen() {
     });
   };
 
+  const journeySummaryText = journeySummary
+    ? `${journeySummary.levelTitle || "Student Clinician"} · Level ${Number(
+        journeySummary.professionalLevel || 1
+      )} · ${Number(journeySummary.xp || 0)} XP · 🔥 ${Number(
+        journeySummary.streak?.currentCount || 0
+      )}-day streak`
+    : null;
+
   return (
     <SafeAreaView style={casesStyles.container}>
       <View style={casesStyles.headerBar}>
         <View style={casesStyles.headerLeft}>
-          <Text style={casesStyles.headerName}>Hi, {displayName}</Text>
+          <Text style={casesStyles.headerName}>
+            {displayName ? `Hi, ${displayName}` : "Welcome"}
+          </Text>
           <Text numberOfLines={1} style={casesStyles.headerEmail}>
             {user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || ""}
           </Text>
@@ -456,18 +413,11 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={casesStyles.scrollContent}>
-        <View style={casesStyles.pointsCard}>
-          <Text style={casesStyles.pointsLabel}>TOTAL POINTS</Text>
-          {loadingProgress ? (
-            <ActivityIndicator style={{ marginTop: 8 }} />
-          ) : (
-            <>
-              <Text style={casesStyles.pointsValue}>{points}</Text>
-              <Text style={casesStyles.pointsSubText}>Current level: {level}</Text>
-              <Text style={casesStyles.pointsRetryNote}>Highest case score is kept when you retry.</Text>
-            </>
-          )}
-        </View>
+        {!!journeySummaryText && (
+          <View style={casesStyles.journeySummaryCard}>
+            <Text style={casesStyles.journeySummaryText}>{journeySummaryText}</Text>
+          </View>
+        )}
 
         <View style={casesStyles.sectionHeader}>
           <Text style={casesStyles.casesTitle}>Learning Roadmap</Text>
@@ -501,40 +451,14 @@ export default function HomeScreen() {
                   {!!unit.objective && <Text style={casesStyles.unitObjective}>{unit.objective}</Text>}
 
                   <View style={casesStyles.sessionNodeList}>
-                    {unit.sessions.map((session) => {
-                      const label = badgeLabel(session);
-                      return (
-                        <Pressable
-                          key={session.id}
-                          disabled={session.status === "locked"}
-                          onPress={() => openSessionOverview(session)}
-                          style={({ pressed }) => [
-                            casesStyles.roadmapNode,
-                            nodeStyleFor(session),
-                            pressed && session.status !== "locked" && casesStyles.roadmapNodePressed,
-                          ]}
-                        >
-                          <View style={casesStyles.nodeMain}>
-                            <Text style={[casesStyles.roadmapNodeTitle, nodeTextStyleFor(session)]}>
-                              {sessionDisplayTitle(session)}
-                            </Text>
-                            {!!session.objective && (
-                              <Text style={casesStyles.roadmapNodeObjective} numberOfLines={2}>
-                                {session.objective}
-                              </Text>
-                            )}
-                          </View>
-                          <View style={casesStyles.nodeMeta}>
-                            <Text style={[casesStyles.nodeStatusText, nodeTextStyleFor(session)]}>
-                              {label || (session.status === "locked" ? "Locked" : "Available")}
-                            </Text>
-                            {session.bestSessionScore != null && (
-                              <Text style={casesStyles.nodeScoreText}>{session.bestSessionScore}%</Text>
-                            )}
-                          </View>
-                        </Pressable>
-                      );
-                    })}
+                    {unit.sessions.map((session) => (
+                      <SessionCard
+                        key={session.id}
+                        session={session}
+                        metaValue={session.bestSessionScore != null ? `${session.bestSessionScore}%` : null}
+                        onPress={() => openSessionOverview(session)}
+                      />
+                    ))}
                   </View>
                 </View>
               ))}

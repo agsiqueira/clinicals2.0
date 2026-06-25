@@ -42,47 +42,6 @@ export const casesStyles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // Points card
-  pointsSection: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  pointsCard: {
-    alignSelf: "center",
-    minWidth: 180,
-    borderWidth: 1,
-    borderColor: "#ddd6fe",
-    backgroundColor: "#faf5ff",
-    borderRadius: 16,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    marginBottom: 16,
-    alignItems: "center",
-  },
-  pointsLabel: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#6d28d9",
-    letterSpacing: 0.3,
-  },
-  pointsValue: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#4c1d95",
-    marginTop: 4,
-  },
-  pointsSubText: {
-    color: "#6b7280",
-    marginTop: 2,
-  },
-  pointsRetryNote: {
-    color: "#6b7280",
-    marginTop: 2,
-    textAlign: "center",
-    fontSize: 12,
-  },
-
   // Section heading
   sectionHeader: {
     marginTop: 8,
@@ -95,6 +54,20 @@ export const casesStyles = StyleSheet.create({
   },
   casesSubText: {
     color: "#6b7280",
+  },
+  journeySummaryCard: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  journeySummaryText: {
+    color: "#4b5563",
+    fontSize: 13,
+    fontWeight: "800",
   },
   loadingBlock: {
     minHeight: 120,

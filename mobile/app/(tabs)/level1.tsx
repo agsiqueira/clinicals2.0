@@ -20,6 +20,7 @@ import { VideoView, useVideoPlayer } from "expo-video";
 import * as FileSystem from "expo-file-system/legacy";
 import { caseStyles } from "../../assets/styles/case.styles";
 import { deleteItemAsync, getItemAsync, setItemAsync } from "../../src/utils/storage";
+import { sessionDisplayTitle } from "../../src/utils/clinicalDisplay";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const API_PREFIX = "/api";
@@ -814,7 +815,7 @@ const { sound } = await Audio.Sound.createAsync(
     setItemAsync(conversationStorageKey, conversationId).catch(() => {});
   }, [conversationId, conversationStorageKey]);
 
-  // on mount, check if a previous conversation exists for this case
+  // on mount, check if a previous non-trivial conversation exists for this patient session
   useEffect(() => {
     let cancelled = false;
 
@@ -823,10 +824,51 @@ const { sound } = await Audio.Sound.createAsync(
         const saved = await getItemAsync(conversationStorageKey);
         if (cancelled) return;
 
-        if (saved) {
+        if (!saved) {
+          setSavedConversationId(null);
+          setShowResumePrompt(false);
+          return;
+        }
+
+        try {
+          const data = await request(`/conversations/${saved}`, {
+            headers: userHeaders,
+          });
+          if (cancelled) return;
+
+          const savedMessages = Array.isArray(data?.messages) ? data.messages : [];
+          const hasUserMessage = savedMessages.some((msg: any) => msg?.role === "user");
+          const hasPatientMessage = savedMessages.some(
+            (msg: any) => msg?.role === "assistant" || msg?.role === "patient"
+          );
+          const savedPatientSessionSlug = data?.patientSessionSlug
+            ? String(data.patientSessionSlug)
+            : null;
+          const mismatchedPatientSession =
+            Boolean(savedPatientSessionSlug && patientSessionSlug) &&
+            savedPatientSessionSlug !== patientSessionSlug;
+          const shouldSuppressResume =
+            data?.status === "SUBMITTED" ||
+            Boolean(data?.submission) ||
+            data?.caseId !== caseId ||
+            mismatchedPatientSession ||
+            savedMessages.length < 2 ||
+            !hasUserMessage ||
+            !hasPatientMessage;
+
+          if (shouldSuppressResume) {
+            await deleteItemAsync(conversationStorageKey).catch(() => {});
+            if (cancelled) return;
+            setSavedConversationId(null);
+            setShowResumePrompt(false);
+            return;
+          }
+
           setSavedConversationId(saved);
           setShowResumePrompt(true);
-        } else {
+        } catch {
+          await deleteItemAsync(conversationStorageKey).catch(() => {});
+          if (cancelled) return;
           setSavedConversationId(null);
           setShowResumePrompt(false);
         }
@@ -840,7 +882,7 @@ const { sound } = await Audio.Sound.createAsync(
     return () => {
       cancelled = true;
     };
-  }, [conversationStorageKey]);
+  }, [caseId, conversationStorageKey, patientSessionSlug, userHeaders]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1148,6 +1190,10 @@ const { sound } = await Audio.Sound.createAsync(
   const reviewSessionScore = visibleDebrief?.sessionScore ?? submissionResult?.score ?? 0;
   const reviewBadgeLabel = visibleDebrief?.badgeLabel || badgeLabelFromTier(badgeTierFromScore(reviewSessionScore));
   const reviewSubmittedAt = formatResultDate(submissionResult?.submittedAt);
+  const resumeSessionTitle =
+    sessionDisplayTitle({ slug: patientSessionSlug || undefined, title: caseData?.display_title || undefined }) ||
+    caseData?.display_title ||
+    "this session";
 
   const sendDebriefMessage = useCallback(
     async (messageOverride?: string) => {
@@ -1192,9 +1238,9 @@ const { sound } = await Audio.Sound.createAsync(
     [conversationId, debriefInput, debriefMessages, debriefSending, userHeaders]
   );
 
-  const returnToRoadmap = useCallback(() => {
+  const continueLearning = useCallback(() => {
     setDebriefVisible(false);
-    router.push("/(tabs)/cases");
+    router.push("/(tabs)");
   }, [router]);
 
   const resumeConversation = useCallback(async () => {
@@ -1272,9 +1318,9 @@ const { sound } = await Audio.Sound.createAsync(
       {showResumePrompt && (
         <View style={caseStyles.resumeOverlay}>
           <View style={caseStyles.resumeCard}>
-            <Text style={caseStyles.resumeTitle}>Resume previous session?</Text>
+            <Text style={caseStyles.resumeTitle}>Resume previous attempt?</Text>
             <Text style={caseStyles.resumeSubText}>
-              You have an unfinished interview for this case. Resume to where you left off or start over.
+              You have an unfinished attempt for {resumeSessionTitle}. Resume where you left off or start a new attempt.
             </Text>
             <Pressable
               onPress={resumeConversation}
@@ -1289,7 +1335,7 @@ const { sound } = await Audio.Sound.createAsync(
               onPress={startFresh}
               style={caseStyles.resumeSecondaryButton}
             >
-              <Text style={caseStyles.resumeSecondaryButtonText}>Start Fresh</Text>
+              <Text style={caseStyles.resumeSecondaryButtonText}>Start New Attempt</Text>
             </Pressable>
           </View>
         </View>
@@ -1461,8 +1507,8 @@ const { sound } = await Audio.Sound.createAsync(
                   <Pressable onPress={() => setDebriefVisible(false)} style={caseStyles.debriefSecondaryButton}>
                     <Text style={caseStyles.debriefSecondaryButtonText}>Review Results</Text>
                   </Pressable>
-                  <Pressable onPress={returnToRoadmap} style={caseStyles.debriefPrimaryButton}>
-                    <Text style={caseStyles.debriefPrimaryButtonText}>Return to Roadmap</Text>
+                  <Pressable onPress={continueLearning} style={caseStyles.debriefPrimaryButton}>
+                    <Text style={caseStyles.debriefPrimaryButtonText}>Continue Learning</Text>
                   </Pressable>
                 </View>
               </ScrollView>
@@ -1692,14 +1738,14 @@ const { sound } = await Audio.Sound.createAsync(
                   Retry starts a brand new attempt. Your highest point total for this case is the one kept.
                 </Text>
                 <Pressable
-                  onPress={() => router.push("/(tabs)/cases")}
+                  onPress={() => router.push("/(tabs)")}
                   style={({ pressed }) => ({
                     ...caseStyles.outlineButton,
                     flex: undefined,
                     opacity: pressed ? 0.7 : 1,
                   })}
                 >
-                  <Text style={caseStyles.outlineButtonText}>Return to Roadmap</Text>
+                  <Text style={caseStyles.outlineButtonText}>Continue Learning</Text>
                 </Pressable>
                 <Pressable
                   onPress={retryCase}

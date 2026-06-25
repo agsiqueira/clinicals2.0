@@ -115,6 +115,8 @@ export const api = {
   getCases: () => request("/cases"),
   getCaseById: (id) => request(`/cases/${id}`),
   getProgress: (headers) => request("/progress", { headers }),
+  getClinicalPortfolio: (headers) => request("/clinical-portfolio", { headers }),
+  getToday: (headers) => request("/today", { headers }),
 
   // Example: create a case
   createCase: (payload) =>

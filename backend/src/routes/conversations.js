@@ -215,7 +215,12 @@ router.get("/:id", async (req, res, next) => {
       include: {
         patientCase: true,
         messages: { orderBy: { createdAt: "asc" } },
-        submission: true
+        submission: true,
+        sessionAttempt: {
+          include: {
+            patientSession: true,
+          },
+        },
       }
     });
 
@@ -236,6 +241,7 @@ router.get("/:id", async (req, res, next) => {
     res.json({
       conversationId: conversation.id,
       caseId: conversation.patientCase.caseId,
+      patientSessionSlug: conversation.sessionAttempt?.patientSession?.slug || null,
       status: conversation.status,
       startedAt: conversation.startedAt,
       submittedAt: conversation.submittedAt,

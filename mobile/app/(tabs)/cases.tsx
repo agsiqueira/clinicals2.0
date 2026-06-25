@@ -14,6 +14,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../../src/api/client";
 import { casesStyles } from "../../assets/styles/cases.styles";
+import { CompactJourneyCard } from "../../src/components/CompactJourneyCard";
+import { EncounterNodeCard } from "../../src/components/EncounterNodeCard";
 import { PatientAvatar } from "../../src/components/PatientAvatar";
 import {
   overviewEncounterTitle,
@@ -196,12 +198,6 @@ function encounterStatusLabel(session: RoadmapSession) {
   if (session.status === "locked") return "Locked";
   if (session.status !== "completed") return "Available";
   return null;
-}
-
-function encounterStatusStyle(session: RoadmapSession, isRetry = false) {
-  if (isRetry) return casesStyles.encounterStatusRetry;
-  if (session.status === "locked") return casesStyles.encounterStatusLocked;
-  return casesStyles.encounterStatusAvailable;
 }
 
 function rotationComplete(unit: RoadmapUnit) {
@@ -450,14 +446,6 @@ export default function HomeScreen() {
     });
   };
 
-  const journeySummaryText = journeySummary
-    ? `${journeySummary.levelTitle || "Student Clinician"} · Level ${Number(
-        journeySummary.professionalLevel || 1
-      )} · ${Number(journeySummary.xp || 0)} XP · 🔥 ${Number(
-        journeySummary.streak?.currentCount || 0
-      )}-day streak`
-    : null;
-
   return (
     <SafeAreaView style={casesStyles.container}>
       <View style={casesStyles.headerBar}>
@@ -479,10 +467,13 @@ export default function HomeScreen() {
       </View>
 
       <ScrollView contentContainerStyle={casesStyles.scrollContent}>
-        {!!journeySummaryText && (
-          <View style={casesStyles.journeySummaryCard}>
-            <Text style={casesStyles.journeySummaryText}>{journeySummaryText}</Text>
-          </View>
+        {!!journeySummary && (
+          <CompactJourneyCard
+            levelTitle={journeySummary.levelTitle}
+            professionalLevel={journeySummary.professionalLevel}
+            xp={journeySummary.xp}
+            streakCount={journeySummary.streak?.currentCount}
+          />
         )}
 
         <View style={casesStyles.sectionHeader}>
@@ -539,10 +530,6 @@ export default function HomeScreen() {
                           const isLocked = session.status === "locked";
                           const isCompleted = session.status === "completed";
                           const isLast = index === unit.sessions.length - 1;
-                          const roundedScore =
-                            isCompleted && session.bestSessionScore != null
-                              ? `${Math.round(Number(session.bestSessionScore))}%`
-                              : null;
                           const nextSessionLocked = unit.sessions[index + 1]?.status === "locked";
                           const shouldRetry =
                             isCompleted &&
@@ -555,75 +542,20 @@ export default function HomeScreen() {
                             : isCompleted
                               ? completedMasteryLabel(session)
                               : encounterStatusLabel(session);
-                          const badgeOverlay =
-                            session.badgeTier === "GOLD"
-                              ? "🥇"
-                              : session.badgeTier === "SILVER"
-                                ? "🥈"
-                                : session.badgeTier === "BRONZE"
-                                  ? "🥉"
-                                  : null;
 
                           return (
                             <View key={session.id} style={casesStyles.encounterCardStack}>
-                              <Pressable
+                              <EncounterNodeCard
+                                patientName={display.patientName}
+                                encounterTitle={display.taskTitle}
+                                patientSessionSlug={session.slug}
+                                status={session.status}
+                                tier={session.badgeTier}
+                                bestScore={session.bestSessionScore}
+                                statusLabel={chipLabel}
                                 disabled={isLocked}
                                 onPress={() => openSessionOverview(session)}
-                                style={({ pressed }) => [
-                                  casesStyles.encounterNodeCard,
-                                  isLocked && casesStyles.encounterNodeCardLocked,
-                                  isCompleted && casesStyles.encounterNodeCardCompleted,
-                                  pressed && !isLocked && casesStyles.roadmapNodePressed,
-                                ]}
-                              >
-                                <View style={casesStyles.patientAvatarWrap}>
-                                  <PatientAvatar
-                                    patientName={display.patientName}
-                                    patientSessionSlug={session.slug}
-                                    size={56}
-                                    status={session.status}
-                                    tier={session.badgeTier}
-                                  />
-                                  {!!badgeOverlay && (
-                                    <Text style={casesStyles.patientNodeBadge}>{badgeOverlay}</Text>
-                                  )}
-                                </View>
-
-                                <Text
-                                  style={[
-                                    casesStyles.encounterPatientName,
-                                    isLocked && casesStyles.encounterTextLocked,
-                                  ]}
-                                >
-                                  {display.patientName}
-                                </Text>
-                                {!!display.taskTitle && (
-                                  <Text
-                                    style={[
-                                      casesStyles.encounterTask,
-                                      isLocked && casesStyles.encounterTextLocked,
-                                    ]}
-                                  >
-                                    {display.taskTitle}
-                                  </Text>
-                                )}
-
-                                {!!chipLabel && (
-                                  <Text
-                                    style={[
-                                      casesStyles.encounterStatus,
-                                      isCompleted
-                                        ? casesStyles.encounterStatusMastered
-                                        : encounterStatusStyle(session, shouldRetry),
-                                    ]}
-                                  >
-                                    {chipLabel}
-                                  </Text>
-                                )}
-                                {!!roundedScore && shouldRetry ? (
-                                  <Text style={casesStyles.encounterScore}>{roundedScore}</Text>
-                                ) : null}
-                              </Pressable>
+                              />
                               {!isLast && <View style={casesStyles.connectorLine} />}
                             </View>
                           );

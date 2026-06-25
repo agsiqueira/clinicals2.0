@@ -171,6 +171,19 @@ type SubmissionResult = {
   missed_red_flags: string[];
   critical_fails_triggered: string[];
   clinicals2Debrief?: Clinicals2Debrief | null;
+  motivationalAchievements?: {
+    newlyEarned?: MotivationalAchievementUnlock[];
+  } | null;
+};
+
+type MotivationalAchievementUnlock = {
+  slug?: string | null;
+  title?: string | null;
+  status?: string | null;
+  currentValue?: number | null;
+  targetValue?: number | null;
+  earnedAt?: string | null;
+  icon?: string | null;
 };
 
 type Clinicals2AchievementResult = {
@@ -282,7 +295,14 @@ function normalizeSubmissionPayload(payload: any): SubmissionResult {
       ? details.critical_fails_triggered
       : [],
     clinicals2Debrief: payload?.clinicals2Debrief ?? details?.clinicals2Debrief ?? null,
+    motivationalAchievements:
+      payload?.motivationalAchievements ?? details?.motivationalAchievements ?? null,
   };
+}
+
+function newlyEarnedAchievements(result?: SubmissionResult | null) {
+  const earned = result?.motivationalAchievements?.newlyEarned;
+  return Array.isArray(earned) ? earned : [];
 }
 
 function badgeTierFromScore(score: number) {
@@ -397,6 +417,7 @@ export default function Level1Screen() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submissionResult, setSubmissionResult] = useState<SubmissionResult | null>(null);
+  const [achievementUnlockVisible, setAchievementUnlockVisible] = useState(false);
   const [debriefVisible, setDebriefVisible] = useState(false);
   const [debriefMessages, setDebriefMessages] = useState<DebriefChatMessage[]>([]);
   const [debriefInput, setDebriefInput] = useState("");
@@ -797,6 +818,7 @@ const { sound } = await Audio.Sound.createAsync(
     setStage("chat");
     setHpiText("");
     setSubmissionResult(null);
+    setAchievementUnlockVisible(false);
     setDebriefVisible(false);
     setDebriefMessages([]);
     setDebriefInput("");
@@ -987,6 +1009,7 @@ const { sound } = await Audio.Sound.createAsync(
         setStage("chat");
         setHpiText("");
         setSubmissionResult(null);
+        setAchievementUnlockVisible(false);
         setSubmitError(null);
       } catch (e: any) {
         if (cancelled) return;
@@ -1089,7 +1112,8 @@ const { sound } = await Audio.Sound.createAsync(
         body: { hpi, patientSessionSlug },
       });
 
-      setSubmissionResult(normalizeSubmissionPayload({ ...data, hpi }));
+      const normalizedSubmission = normalizeSubmissionPayload({ ...data, hpi });
+      setSubmissionResult(normalizedSubmission);
       await deleteItemAsync(conversationStorageKey).catch(() => {});
       setStage("results");
       setDebriefMessages([]);
@@ -1097,7 +1121,12 @@ const { sound } = await Audio.Sound.createAsync(
       setDebriefSending(false);
       setDebriefError(null);
       setShowDetailedRubric(false);
-      setDebriefVisible(true);
+      if (newlyEarnedAchievements(normalizedSubmission).length > 0) {
+        setAchievementUnlockVisible(true);
+        setDebriefVisible(false);
+      } else {
+        setDebriefVisible(true);
+      }
     } catch (e: any) {
       const message = String(e?.message || "Failed to submit case.");
       const timedOut = message.toLowerCase().includes("timed out");
@@ -1116,6 +1145,7 @@ const { sound } = await Audio.Sound.createAsync(
               clinicals2Debrief: conversationData.submission.clinicals2Debrief || null,
             };
             setSubmissionResult(normalizeSubmissionPayload(fromSavedSubmission));
+            setAchievementUnlockVisible(false);
             setStage("results");
             setDebriefMessages([]);
             setDebriefInput("");
@@ -1190,6 +1220,8 @@ const { sound } = await Audio.Sound.createAsync(
   const reviewSessionScore = visibleDebrief?.sessionScore ?? submissionResult?.score ?? 0;
   const reviewBadgeLabel = visibleDebrief?.badgeLabel || badgeLabelFromTier(badgeTierFromScore(reviewSessionScore));
   const reviewSubmittedAt = formatResultDate(submissionResult?.submittedAt);
+  const achievementUnlocks = newlyEarnedAchievements(submissionResult);
+  const firstAchievementUnlock = achievementUnlocks[0] || null;
   const resumeSessionTitle =
     sessionDisplayTitle({ slug: patientSessionSlug || undefined, title: caseData?.display_title || undefined }) ||
     caseData?.display_title ||
@@ -1239,6 +1271,7 @@ const { sound } = await Audio.Sound.createAsync(
   );
 
   const continueLearning = useCallback(() => {
+    setAchievementUnlockVisible(false);
     setDebriefVisible(false);
     router.push("/(tabs)");
   }, [router]);
@@ -1288,6 +1321,7 @@ const { sound } = await Audio.Sound.createAsync(
     setHpiText("");
     setSubmitError(null);
     setSubmissionResult(null);
+    setAchievementUnlockVisible(false);
     setDebriefVisible(false);
     setDebriefMessages([]);
     setDebriefInput("");
@@ -1351,6 +1385,41 @@ const { sound } = await Audio.Sound.createAsync(
           </View>
         </View>
       )}
+      <Modal
+        visible={achievementUnlockVisible && Boolean(firstAchievementUnlock)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setAchievementUnlockVisible(false);
+          setDebriefVisible(true);
+        }}
+      >
+        <View style={caseStyles.debriefOverlay}>
+          <View style={caseStyles.achievementUnlockCard}>
+            <Text style={caseStyles.achievementUnlockIcon}>
+              {firstAchievementUnlock?.icon || "🏅"}
+            </Text>
+            <Text style={caseStyles.achievementUnlockEyebrow}>Achievement Unlocked</Text>
+            <Text style={caseStyles.achievementUnlockTitle}>
+              {firstAchievementUnlock?.title || "Clinical Milestone"}
+            </Text>
+            {achievementUnlocks.length > 1 ? (
+              <Text style={caseStyles.achievementUnlockSubText}>
+                +{achievementUnlocks.length - 1} more
+              </Text>
+            ) : null}
+            <Pressable
+              onPress={() => {
+                setAchievementUnlockVisible(false);
+                setDebriefVisible(true);
+              }}
+              style={caseStyles.debriefPrimaryButton}
+            >
+              <Text style={caseStyles.debriefPrimaryButtonText}>Continue</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       <Modal
         visible={debriefVisible && Boolean(visibleDebrief)}
         transparent

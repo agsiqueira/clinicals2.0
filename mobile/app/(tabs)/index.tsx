@@ -13,7 +13,8 @@ import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../../src/api/client";
 import { portfolioStyles } from "../../assets/styles/portfolio.styles";
-import { SessionCard } from "../../src/components/SessionCard";
+import { CompactJourneyCard } from "../../src/components/CompactJourneyCard";
+import { EncounterNodeCard } from "../../src/components/EncounterNodeCard";
 
 type TodayIdentity = {
   professionalLevel?: number | null;
@@ -74,24 +75,67 @@ type TodayResponse = {
 
 type TodayNextGoal = NonNullable<NonNullable<TodayResponse["dailyBriefing"]>["nextGoal"]>;
 
-function toNumber(value: unknown, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 function actionLabel(encounter?: TodayEncounter | null) {
   if (!encounter) return "Open Roadmap";
+  if (encounter.status === "in_progress") return "Continue Encounter";
   if (encounter.status === "completed") return "Retry Encounter";
   return "Start Encounter";
+}
+
+function encounterDisplayParts(encounter?: TodayEncounter | null) {
+  const displayTitle = encounter?.displayTitle || encounter?.title || "Patient Encounter";
+  const [patientName, ...taskParts] = displayTitle.split(":");
+  const taskTitle = taskParts.join(":").trim();
+
+  return {
+    patientName: taskTitle ? patientName.trim() : "Patient",
+    taskTitle: taskTitle || displayTitle,
+  };
 }
 
 function goalProgressText(goal?: TodayNextGoal | null) {
   const current = Number(goal?.currentValue);
   const target = Number(goal?.targetValue);
-  if (Number.isFinite(current) && Number.isFinite(target) && target > 0) {
-    return `${current} of ${target}`;
+  if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) return null;
+
+  const title = String(goal?.title || "");
+  const description = String(goal?.description || "");
+  const type = String(goal?.type || "");
+  const isUnlockScoreGoal =
+    target === 84 || /unlock|score|best/i.test(`${title} ${description} ${type}`);
+
+  if (isUnlockScoreGoal) {
+    return {
+      primary: `Current best: ${Math.round(current)}%`,
+      secondary: `Goal: ${Math.round(target)}% to unlock the next encounter`,
+    };
   }
-  return null;
+
+  const unit = /streak|day/i.test(`${title} ${description} ${type}`) ? " days" : " encounters";
+  return {
+    primary: `${Math.round(current)} / ${Math.round(target)}${unit}`,
+    secondary: null,
+  };
+}
+
+function mentorCoachingMessage({
+  motivation,
+  focus,
+  goalProgress,
+}: {
+  motivation?: string | null;
+  focus?: string | null;
+  goalProgress?: ReturnType<typeof goalProgressText>;
+}) {
+  const pieces = [motivation, focus, goalProgress?.secondary]
+    .filter(Boolean)
+    .map((piece) => String(piece).trim().replace(/\s+/g, " "));
+
+  if (pieces.length === 0) {
+    return "Start with a professional introduction, then focus on the clinical task for this encounter.";
+  }
+
+  return Array.from(new Set(pieces)).join(" ");
 }
 
 export default function TodayScreen() {
@@ -173,22 +217,12 @@ export default function TodayScreen() {
   const dailyBriefing = today?.dailyBriefing || {};
   const nextGoal = dailyBriefing.nextGoal || null;
   const nextGoalProgress = goalProgressText(nextGoal);
-  const roadmapCta = today?.roadmapCta || {
-    title: "Explore your full learning path",
-    body: "See all units, upcoming encounters, and what unlocks next.",
-  };
-
-  const recommendedSession = recommendedEncounter
-    ? {
-        id: recommendedEncounter.patientSessionId || recommendedEncounter.patientSessionSlug || "today-session",
-        slug: recommendedEncounter.patientSessionSlug || undefined,
-        title: recommendedEncounter.displayTitle || recommendedEncounter.title || "Next Encounter",
-        objective: recommendedEncounter.description || undefined,
-        status: recommendedEncounter.status || "available",
-        badgeTier: recommendedEncounter.badgeTier || null,
-        bestSessionScore: recommendedEncounter.bestSessionScore ?? null,
-      }
-    : null;
+  const mentorMessage = mentorCoachingMessage({
+    motivation: dailyBriefing.motivation,
+    focus: dailyBriefing.focus,
+    goalProgress: nextGoalProgress,
+  });
+  const recommendedDisplay = encounterDisplayParts(recommendedEncounter);
 
   const openRecommendedSession = () => {
     if (!recommendedEncounter?.patientSessionSlug) {
@@ -227,7 +261,9 @@ export default function TodayScreen() {
         <View style={portfolioStyles.screenHeaderRow}>
           <View style={portfolioStyles.screenHeaderText}>
             <Text style={portfolioStyles.screenTitle}>Today</Text>
-            <Text style={portfolioStyles.screenSubtitle}>Your next step in clinical practice</Text>
+            <Text style={portfolioStyles.screenSubtitle}>
+              {user?.firstName ? `Welcome, ${user.firstName}.` : "Welcome."} What should you do next?
+            </Text>
           </View>
           <Pressable
             onPress={handleSignOut}
@@ -249,30 +285,27 @@ export default function TodayScreen() {
           </View>
         ) : null}
 
-        <View style={portfolioStyles.todayHeroCard}>
-          <Text style={portfolioStyles.identityLabel}>Your Journey</Text>
-          <Text style={portfolioStyles.identityTitle}>{identity.levelTitle || "Student Clinician"}</Text>
-          <View style={portfolioStyles.compactStatsRow}>
-            <Text style={portfolioStyles.compactStatText}>
-              Level {toNumber(identity.professionalLevel, 1)}
-            </Text>
-            <Text style={portfolioStyles.compactStatText}>{toNumber(identity.xp, 0)} XP</Text>
-            <Text style={portfolioStyles.compactStatText}>
-              🔥 {toNumber(streak.currentCount, 0)} days
-            </Text>
-          </View>
-          <Pressable onPress={() => router.push("/clinical-portfolio")} style={portfolioStyles.journeyPortfolioLink}>
-            <Text style={portfolioStyles.portfolioTextLinkText}>View Full Clinical Portfolio →</Text>
-          </Pressable>
-        </View>
+        <CompactJourneyCard
+          levelTitle={identity.levelTitle}
+          professionalLevel={identity.professionalLevel}
+          xp={identity.xp}
+          streakCount={streak.currentCount}
+        />
 
         <View style={portfolioStyles.nextSessionCard}>
-          <Text style={portfolioStyles.smallLabel}>Your Next Encounter</Text>
-          {recommendedSession ? (
-            <SessionCard
-              session={recommendedSession}
-              metaValue={recommendedEncounter?.estimatedTime?.label || null}
+          <Text style={portfolioStyles.smallLabel}>Continue Your Journey</Text>
+          {recommendedEncounter ? (
+            <EncounterNodeCard
+              patientName={recommendedDisplay.patientName}
+              encounterTitle={recommendedDisplay.taskTitle}
+              patientSessionSlug={recommendedEncounter.patientSessionSlug}
+              caseId={recommendedEncounter.caseId}
+              status={recommendedEncounter.status || "available"}
+              tier={recommendedEncounter.badgeTier}
+              bestScore={recommendedEncounter.bestSessionScore}
+              estimatedTimeLabel={recommendedEncounter.estimatedTime?.label || null}
               onPress={openRecommendedSession}
+              variant="today"
             />
           ) : (
             <Text style={portfolioStyles.nextSessionTitle}>
@@ -280,45 +313,26 @@ export default function TodayScreen() {
             </Text>
           )}
 
+          {!!nextGoal && (
+            <View style={portfolioStyles.todayGoalTeaser}>
+              <Text style={portfolioStyles.todayGoalTeaserLabel}>Next achievement</Text>
+              <Text style={portfolioStyles.todayGoalTeaserText}>
+                {nextGoal.icon ? `${nextGoal.icon} ` : ""}
+                {nextGoal.title || "Clinical milestone"}
+              </Text>
+              {!!nextGoal.description && (
+                <Text style={portfolioStyles.todayGoalTeaserMeta}>{nextGoal.description}</Text>
+              )}
+            </View>
+          )}
+
           <View style={portfolioStyles.mentorCallout}>
-            <Text style={portfolioStyles.mentorCalloutLabel}>💬 Dr. Martinez</Text>
-            {!!dailyBriefing.motivation && (
-              <Text style={portfolioStyles.mentorCalloutText}>{dailyBriefing.motivation}</Text>
-            )}
-            {!!dailyBriefing.focus && (
-              <>
-                <Text style={portfolioStyles.mentorCalloutSectionLabel}>Today&apos;s Focus</Text>
-                <Text style={portfolioStyles.mentorCalloutText}>{dailyBriefing.focus}</Text>
-              </>
-            )}
-            {!!nextGoal && (
-              <>
-                <Text style={portfolioStyles.mentorCalloutSectionLabel}>Next Goal</Text>
-                <Text style={portfolioStyles.mentorCalloutText}>
-                  {nextGoal.icon ? `${nextGoal.icon} ` : ""}
-                  {nextGoal.title || "Clinical milestone"}
-                  {nextGoalProgress ? ` · ${nextGoalProgress}` : ""}
-                </Text>
-              </>
-            )}
+            <Text style={portfolioStyles.mentorCalloutLabel}>🩺 Dr. Martinez · Mentor Guidance</Text>
+            <Text style={portfolioStyles.mentorCalloutText}>{mentorMessage}</Text>
           </View>
 
           <Pressable onPress={openRecommendedSession} style={portfolioStyles.primaryCta}>
             <Text style={portfolioStyles.primaryCtaText}>{actionLabel(recommendedEncounter)}</Text>
-          </Pressable>
-        </View>
-
-        <View style={portfolioStyles.roadmapHelperCard}>
-          <View style={portfolioStyles.roadmapSecondaryText}>
-            <Text style={portfolioStyles.roadmapSecondaryTitle}>
-              {roadmapCta.title || "Explore your full learning path"}
-            </Text>
-            <Text style={portfolioStyles.roadmapSecondaryBody}>
-              {roadmapCta.body || "See all units, upcoming encounters, and what unlocks next."}
-            </Text>
-          </View>
-          <Pressable onPress={() => router.push("/(tabs)/cases")} style={portfolioStyles.roadmapSecondaryButton}>
-            <Text style={portfolioStyles.roadmapSecondaryButtonText}>Roadmap</Text>
           </Pressable>
         </View>
       </ScrollView>

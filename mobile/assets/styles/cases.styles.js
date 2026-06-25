@@ -213,6 +213,10 @@ export const casesStyles = StyleSheet.create({
     justifyContent: "center",
     gap: 7,
   },
+  encounterNodeCardToday: {
+    width: "100%",
+    minHeight: 174,
+  },
   encounterNodeCardLocked: {
     borderColor: "#d1d5db",
     backgroundColor: "#f9fafb",

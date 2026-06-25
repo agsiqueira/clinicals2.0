@@ -304,7 +304,8 @@ async function buildSavedSubmissionResponse(conversation, progressSummary) {
     missed_red_flags: savedDetails.missed_red_flags || [],
     critical_fails_triggered: savedDetails.critical_fails_triggered || [],
     details: savedDetails,
-    clinicals2Debrief: debrief
+    clinicals2Debrief: debrief,
+    motivationalAchievements: { newlyEarned: [] }
   };
 }
 
@@ -411,12 +412,14 @@ router.post("/:id/submit", async (req, res, next) => {
     });
 
     let clinicals2Debrief = null;
+    let motivationalAchievements = { newlyEarned: [] };
     if (sessionAttempt) {
       const finalizedAttempt = await finalizeSessionAttemptFromSubmission({
         sessionAttemptId: sessionAttempt.id,
         submission,
       });
       clinicals2Debrief = finalizedAttempt?.debrief || null;
+      motivationalAchievements = finalizedAttempt?.motivationalAchievements || motivationalAchievements;
     }
 
     const progressSummary = await syncUserProgress(user.id);
@@ -438,6 +441,7 @@ router.post("/:id/submit", async (req, res, next) => {
       user_total_points: progressSummary.totalPoints,
       user_level: progressSummary.level,
       clinicals2Debrief,
+      motivationalAchievements,
     });
   } catch (err) {
     next(err);

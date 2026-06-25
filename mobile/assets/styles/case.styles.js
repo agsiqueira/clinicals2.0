@@ -593,6 +593,38 @@ export const caseStyles = StyleSheet.create({
     overflow: "hidden",
   },
 
+  achievementUnlockCard: {
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    padding: 20,
+    gap: 10,
+    alignItems: "center",
+  },
+
+  achievementUnlockIcon: {
+    fontSize: 42,
+  },
+
+  achievementUnlockEyebrow: {
+    color: "#6d28d9",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+
+  achievementUnlockTitle: {
+    color: "#111827",
+    fontSize: 22,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  achievementUnlockSubText: {
+    color: "#6b7280",
+    fontWeight: "800",
+    marginBottom: 4,
+  },
+
   debriefScrollContent: {
     padding: 16,
     gap: 14,

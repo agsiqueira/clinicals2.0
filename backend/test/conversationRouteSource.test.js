@@ -15,3 +15,17 @@ test("conversation detail response includes patientSessionSlug from linked sessi
     /patientSessionSlug:\s*conversation\.sessionAttempt\?\.patientSession\?\.slug\s*\|\|\s*null/
   );
 });
+
+test("conversation submit response exposes motivational achievements without replaying saved unlocks", () => {
+  const source = fs.readFileSync(
+    path.resolve(__dirname, "../src/routes/conversations.js"),
+    "utf8"
+  );
+
+  assert.match(
+    source,
+    /motivationalAchievements\s*=\s*finalizedAttempt\?\.motivationalAchievements\s*\|\|\s*motivationalAchievements/
+  );
+  assert.match(source, /motivationalAchievements,\s*\n\s*}\);/);
+  assert.match(source, /motivationalAchievements:\s*{\s*newlyEarned:\s*\[\]\s*}/);
+});

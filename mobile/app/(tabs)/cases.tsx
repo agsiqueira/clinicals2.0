@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Modal,
   Pressable,
   ScrollView,
   Text,
-  TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,8 +15,13 @@ import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../../src/api/client";
 import { casesStyles } from "../../assets/styles/cases.styles";
 import { CompactJourneyCard } from "../../src/components/CompactJourneyCard";
+import { ClinicalsChatComposer } from "../../src/components/ClinicalsChatComposer";
 import { EncounterNodeCard } from "../../src/components/EncounterNodeCard";
+import { MentorAvatar } from "../../src/components/MentorAvatar";
 import { PatientAvatar } from "../../src/components/PatientAvatar";
+import { useEnglishSpeechTranscription } from "../../src/hooks/useEnglishSpeechTranscription";
+import { useSpeechPlayback } from "../../src/hooks/useSpeechPlayback";
+import { useVoicePreference } from "../../src/hooks/useVoicePreference";
 import {
   overviewEncounterTitle,
   overviewPatientName,
@@ -115,6 +120,7 @@ type SessionOverview = {
   } | null;
   preceptorPersona?: {
     name?: string | null;
+    slug?: string | null;
     specialty?: string | null;
     avatarUrl?: string | null;
   } | null;
@@ -133,6 +139,9 @@ const PRECEPTOR_QUICK_ACTIONS = [
   "What is a chief complaint?",
   "What should I focus on?",
 ];
+
+const MENTOR_TTS_VOICE =
+  process.env.EXPO_PUBLIC_NAVIGATOR_MENTOR_TTS_VOICE || "am_adam";
 
 function normalizeLearningPathsResponse(data: any): LearningPath[] {
   if (Array.isArray(data)) return data;
@@ -219,6 +228,9 @@ export default function HomeScreen() {
   const { userId: authUserId, sessionId } = useAuth();
   const { user, isLoaded: userLoaded } = useUser();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isNarrowScreen = width < 420;
+  const mentorAvatarSize = isNarrowScreen ? 196 : 226;
   const searchParams = useLocalSearchParams<{
     focusSessionSlug?: string | string[];
     focusSessionToken?: string | string[];
@@ -246,6 +258,19 @@ export default function HomeScreen() {
   const [preceptorInput, setPreceptorInput] = useState("");
   const [preceptorSending, setPreceptorSending] = useState(false);
   const [preceptorError, setPreceptorError] = useState<string | null>(null);
+  const { voiceEnabled: mentorVoiceEnabled, setVoiceEnabled: setMentorVoiceEnabled } =
+    useVoicePreference();
+  const preceptorDialogueRef = useRef<ScrollView | null>(null);
+  const preceptorTranscription = useEnglishSpeechTranscription({
+    onText: setPreceptorInput,
+    onError: () => setPreceptorError("Could not transcribe audio. Please try again or type your question."),
+  });
+  const mentorSpeech = useSpeechPlayback({
+    voice: MENTOR_TTS_VOICE,
+    onError: () => {
+      // Keep mentor chat usable when TTS is unavailable.
+    },
+  });
   const [autoOpenedSessionKey, setAutoOpenedSessionKey] = useState<string | null>(null);
 
   const userHeaders = useMemo(() => {
@@ -406,6 +431,9 @@ export default function HomeScreen() {
     setPreceptorInput("");
     setPreceptorError(null);
     setPreceptorSending(true);
+    if (mentorSpeech.isSpeaking) {
+      void mentorSpeech.stop();
+    }
 
     try {
       const data = await api.sendPreceptorChatMessage(
@@ -417,15 +445,19 @@ export default function HomeScreen() {
         userHeaders
       );
       const reply = String(data?.reply || "").trim();
+      const assistantReply =
+        reply ||
+        "Focus on greeting the patient professionally and inviting them to share their main concern.";
       setPreceptorMessages((current) => [
         ...current,
         {
           role: "assistant",
-          content:
-            reply ||
-            "Focus on greeting the patient professionally and inviting them to share their main concern.",
+          content: assistantReply,
         },
       ]);
+      if (mentorVoiceEnabled) {
+        void mentorSpeech.speak(assistantReply);
+      }
     } catch (err: any) {
       setPreceptorError(err?.message || "Dr. Martinez could not respond right now.");
     } finally {
@@ -445,6 +477,31 @@ export default function HomeScreen() {
       },
     });
   };
+
+  const preceptorName = selectedOverview?.preceptorPersona?.name || "Dr. Martinez";
+  const preceptorSpecialty =
+    selectedOverview?.preceptorPersona?.specialty || "Clinical Preceptor";
+  const preceptorSlug = selectedOverview?.preceptorPersona?.slug || "dr-martinez";
+  const welcomeMessage =
+    preceptorMessages.find((message) => message.role === "assistant")?.content ||
+    INITIAL_PRECEPTOR_BRIEFING;
+  const conversationMessages =
+    preceptorMessages[0]?.role === "assistant" ? preceptorMessages.slice(1) : preceptorMessages;
+  const scrollPreceptorDialogueToEnd = useCallback(() => {
+    setTimeout(() => {
+      preceptorDialogueRef.current?.scrollToEnd({ animated: true });
+    }, 80);
+  }, []);
+
+  useEffect(() => {
+    if (!briefingVisible) return;
+    scrollPreceptorDialogueToEnd();
+  }, [
+    briefingVisible,
+    conversationMessages.length,
+    preceptorSending,
+    scrollPreceptorDialogueToEnd,
+  ]);
 
   return (
     <SafeAreaView style={casesStyles.container}>
@@ -602,7 +659,7 @@ export default function HomeScreen() {
         onRequestClose={() => setOverviewVisible(false)}
       >
         <View style={casesStyles.modalBackdrop}>
-          <View style={casesStyles.sessionModal}>
+          <View style={[casesStyles.sessionModal, casesStyles.preceptorModal]}>
             {overviewLoading ? (
               <View style={casesStyles.modalLoading}>
                 <ActivityIndicator />
@@ -617,7 +674,7 @@ export default function HomeScreen() {
                 </View>
               </View>
             ) : selectedOverview ? (
-              <ScrollView contentContainerStyle={casesStyles.modalContent}>
+              <ScrollView contentContainerStyle={casesStyles.preceptorModalContent}>
                 {(() => {
                   const weightLabels = achievementWeightLabels(selectedOverview.achievements);
                   const thresholdLabels = badgeThresholdLabels(selectedOverview.badgeThresholds);
@@ -742,116 +799,162 @@ export default function HomeScreen() {
         onRequestClose={() => setBriefingVisible(false)}
       >
         <View style={casesStyles.modalBackdrop}>
-          <View style={casesStyles.sessionModal}>
+          <View style={casesStyles.preceptorOverlay}>
             {selectedOverview ? (
-              <ScrollView contentContainerStyle={casesStyles.modalContent}>
-                <View style={casesStyles.preceptorHeader}>
-                  <View style={casesStyles.preceptorAvatarCircle}>
-                    <Text style={casesStyles.preceptorAvatarText}>
-                      {(selectedOverview.preceptorPersona?.name || "Dr. Martinez")
-                        .split(" ")
-                        .map((part) => part.charAt(0))
-                        .join("")
-                        .slice(0, 2)}
-                    </Text>
-                  </View>
-                  <View style={casesStyles.preceptorHeaderText}>
-                    <Text style={casesStyles.preceptorName}>
-                      {selectedOverview.preceptorPersona?.name || "Dr. Martinez"}
-                    </Text>
-                    <Text style={casesStyles.preceptorSpecialty}>
-                      {selectedOverview.preceptorPersona?.specialty || "Clinical Preceptor"}
-                    </Text>
-                  </View>
+              <>
+                <View
+                  pointerEvents="none"
+                  style={[
+                    casesStyles.preceptorHeroLayer,
+                    isNarrowScreen && casesStyles.preceptorHeroLayerCompact,
+                  ]}
+                >
+                  <MentorAvatar
+                    mentorName={preceptorName}
+                    mentorSlug={preceptorSlug}
+                    isSpeaking={mentorSpeech.isSpeaking}
+                    size={mentorAvatarSize}
+                    variant="breakout-circle"
+                  />
                 </View>
 
-                <View style={casesStyles.preceptorChatBox}>
-                  <Text style={casesStyles.modalSectionTitle}>Dr. Martinez says:</Text>
-                  <View style={casesStyles.preceptorChatMessages}>
-                    {preceptorMessages.length === 0 ? (
-                      <Text style={casesStyles.preceptorChatEmpty}>
-                        Ask about the session goals, introductions, or eliciting the chief complaint.
-                      </Text>
-                    ) : (
-                      preceptorMessages.map((message, index) => (
-                        <View key={`${message.role}-${index}`} style={casesStyles.preceptorChatMessageGroup}>
-                          <View
-                            style={[
-                              casesStyles.preceptorChatBubble,
-                              message.role === "user"
-                                ? casesStyles.preceptorChatBubbleUser
-                                : casesStyles.preceptorChatBubbleAssistant,
+                <View
+                  style={[
+                    casesStyles.sessionModal,
+                    casesStyles.preceptorCard,
+                    isNarrowScreen && casesStyles.preceptorCardCompact,
+                  ]}
+                >
+                  <View style={casesStyles.preceptorFixedHeader}>
+                    <View style={casesStyles.preceptorIdentityRow}>
+                      <View style={casesStyles.preceptorHeaderText}>
+                        <Text style={casesStyles.preceptorName}>{preceptorName}</Text>
+                        <Text style={casesStyles.preceptorSpecialty}>{preceptorSpecialty}</Text>
+                      </View>
+                      <View style={casesStyles.preceptorVoiceControls}>
+                        <Pressable
+                          onPress={() => {
+                            if (mentorVoiceEnabled) {
+                              void mentorSpeech.stop();
+                            }
+                            setMentorVoiceEnabled((current) => !current);
+                          }}
+                          style={({ pressed }) => [
+                            casesStyles.preceptorVoiceToggle,
+                            { opacity: pressed ? 0.75 : 1 },
+                          ]}
+                        >
+                          <Text style={casesStyles.preceptorVoiceToggleText}>
+                            {mentorVoiceEnabled ? "Voice: On" : "Voice: Off"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View
+                    style={[
+                      casesStyles.preceptorDialoguePanel,
+                      isNarrowScreen && casesStyles.preceptorDialoguePanelCompact,
+                    ]}
+                  >
+                    <ScrollView
+                      ref={preceptorDialogueRef}
+                      contentContainerStyle={casesStyles.preceptorDialogueContent}
+                      onContentSizeChange={scrollPreceptorDialogueToEnd}
+                    >
+                      <View style={casesStyles.preceptorChatMessageGroup}>
+                        <View
+                          style={[
+                            casesStyles.preceptorChatBubble,
+                            casesStyles.preceptorChatBubbleAssistant,
+                          ]}
+                        >
+                          <Text style={casesStyles.preceptorChatRole}>Dr. Martinez</Text>
+                          <Text style={casesStyles.preceptorChatText}>{welcomeMessage}</Text>
+                        </View>
+                      </View>
+
+                      <View style={casesStyles.preceptorQuickActions}>
+                        {PRECEPTOR_QUICK_ACTIONS.map((action) => (
+                          <Pressable
+                            key={action}
+                            onPress={() => sendPreceptorMessage(action)}
+                            disabled={preceptorSending}
+                            style={({ pressed }) => [
+                              casesStyles.preceptorQuickActionButton,
+                              { opacity: preceptorSending ? 0.45 : pressed ? 0.75 : 1 },
                             ]}
                           >
-                            <Text style={casesStyles.preceptorChatRole}>
-                              {message.role === "user" ? "You" : "Dr. Martinez"}
-                            </Text>
-                            <Text style={casesStyles.preceptorChatText}>{message.content}</Text>
-                          </View>
-                          {index === 0 && message.role === "assistant" ? (
-                            <View style={casesStyles.preceptorQuickActions}>
-                              {PRECEPTOR_QUICK_ACTIONS.map((action) => (
-                                <Pressable
-                                  key={action}
-                                  onPress={() => sendPreceptorMessage(action)}
-                                  disabled={preceptorSending}
-                                  style={({ pressed }) => [
-                                    casesStyles.preceptorQuickActionButton,
-                                    { opacity: preceptorSending ? 0.45 : pressed ? 0.75 : 1 },
+                            <Text style={casesStyles.preceptorQuickActionText}>{action}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+
+                      <View style={casesStyles.preceptorChatMessages}>
+                        {conversationMessages.length > 0
+                          ? conversationMessages.map((message, index) => (
+                              <View
+                                key={`${message.role}-${index}`}
+                                style={casesStyles.preceptorChatMessageGroup}
+                              >
+                                <View
+                                  style={[
+                                    casesStyles.preceptorChatBubble,
+                                    message.role === "user"
+                                      ? casesStyles.preceptorChatBubbleUser
+                                      : casesStyles.preceptorChatBubbleAssistant,
                                   ]}
                                 >
-                                  <Text style={casesStyles.preceptorQuickActionText}>{action}</Text>
-                                </Pressable>
-                              ))}
-                            </View>
-                          ) : null}
-                        </View>
-                      ))
-                    )}
-                    {preceptorSending ? (
-                      <Text style={casesStyles.preceptorChatEmpty}>Dr. Martinez is responding...</Text>
-                    ) : null}
+                                  <Text style={casesStyles.preceptorChatRole}>
+                                    {message.role === "user" ? "You" : "Dr. Martinez"}
+                                  </Text>
+                                  <Text style={casesStyles.preceptorChatText}>{message.content}</Text>
+                                </View>
+                              </View>
+                            ))
+                          : null}
+                        {preceptorSending ? (
+                          <Text style={casesStyles.preceptorChatEmpty}>Dr. Martinez is responding...</Text>
+                        ) : null}
+                      </View>
+                    </ScrollView>
                   </View>
-                  {preceptorError ? (
-                    <Text style={casesStyles.errorText}>{preceptorError}</Text>
-                  ) : null}
-                  <View style={casesStyles.preceptorChatInputRow}>
-                    <TextInput
+
+                  <View style={casesStyles.preceptorFixedFooter}>
+                    {preceptorError ? (
+                      <Text style={casesStyles.errorText}>{preceptorError}</Text>
+                    ) : null}
+                    <ClinicalsChatComposer
                       value={preceptorInput}
                       onChangeText={setPreceptorInput}
                       editable={!preceptorSending}
                       placeholder="Ask a question before meeting the patient..."
-                      style={casesStyles.preceptorChatInput}
-                      returnKeyType="send"
-                      onSubmitEditing={() => sendPreceptorMessage()}
+                      submitLabel="Ask"
+                      onSubmit={() => sendPreceptorMessage()}
+                      sendDisabled={preceptorSending || !preceptorInput.trim()}
+                      sending={preceptorSending}
+                      onMicPress={preceptorTranscription.toggleRecording}
+                      micDisabled={
+                        preceptorSending ||
+                        preceptorTranscription.transcribing ||
+                        preceptorTranscription.recordingBusy
+                      }
+                      transcribing={preceptorTranscription.transcribing}
+                      isRecording={preceptorTranscription.isRecording}
                     />
-                    <Pressable
-                      onPress={sendPreceptorMessage}
-                      disabled={preceptorSending || !preceptorInput.trim()}
-                      style={({ pressed }) => [
-                        casesStyles.preceptorChatSendButton,
-                        {
-                          opacity:
-                            preceptorSending || !preceptorInput.trim() ? 0.45 : pressed ? 0.75 : 1,
-                        },
-                      ]}
-                    >
-                      <Text style={casesStyles.preceptorChatSendText}>
-                        {preceptorSending ? "..." : "Ask"}
-                      </Text>
-                    </Pressable>
+
+                    <View style={casesStyles.modalActions}>
+                      <Pressable onPress={() => setBriefingVisible(false)} style={casesStyles.modalSecondaryButton}>
+                        <Text style={casesStyles.modalSecondaryButtonText}>Back</Text>
+                      </Pressable>
+                      <Pressable onPress={meetPatient} style={casesStyles.modalPrimaryButton}>
+                        <Text style={casesStyles.modalPrimaryButtonText}>Meet Patient</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
-
-                <View style={casesStyles.modalActions}>
-                  <Pressable onPress={() => setBriefingVisible(false)} style={casesStyles.modalSecondaryButton}>
-                    <Text style={casesStyles.modalSecondaryButtonText}>Back</Text>
-                  </Pressable>
-                  <Pressable onPress={meetPatient} style={casesStyles.modalPrimaryButton}>
-                    <Text style={casesStyles.modalPrimaryButtonText}>Meet Patient</Text>
-                  </Pressable>
-                </View>
-              </ScrollView>
+              </>
             ) : null}
           </View>
         </View>

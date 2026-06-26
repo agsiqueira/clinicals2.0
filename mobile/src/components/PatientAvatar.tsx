@@ -1,5 +1,13 @@
 import { Image, StyleSheet, Text, View } from "react-native";
-import { getPatientAvatarSource, getPatientInitials } from "../utils/patientAssets";
+import {
+  getPatientAvatarSource,
+  getPatientInitials,
+  getPatientTalkingVideoSource,
+  getPatientVisualAssetKey,
+  getPatientVisualAssets,
+} from "../utils/patientAssets";
+
+const SHOW_PATIENT_AVATAR_DEBUG = __DEV__;
 
 type PatientAvatarProps = {
   patientName?: string | null;
@@ -34,9 +42,23 @@ export function PatientAvatar({
   fallbackInitials = "PT",
 }: PatientAvatarProps) {
   const imageSource = getPatientAvatarSource({ patientSessionSlug, caseId });
+  const patientAssetKey = getPatientVisualAssetKey({ patientSessionSlug, caseId });
+  const visualAssets = getPatientVisualAssets({ patientSessionSlug, caseId });
+  const talkingAsset = getPatientTalkingVideoSource({ patientSessionSlug, caseId });
   const initials = getPatientInitials(patientName, fallbackInitials);
   const ringWidth = showRing ? (status === "locked" ? 2 : tier === "GOLD" ? 5 : 4) : 0;
   const innerSize = Math.max(0, size - ringWidth * 2);
+
+  if (SHOW_PATIENT_AVATAR_DEBUG) {
+    console.debug("[PatientAvatar]", {
+      patientSessionSlug,
+      caseId,
+      patientAssetKey,
+      hasStaticImage: Boolean(imageSource),
+      hasIdleAsset: Boolean(visualAssets?.idle),
+      hasTalkingAsset: Boolean(talkingAsset),
+    });
+  }
 
   return (
     <View

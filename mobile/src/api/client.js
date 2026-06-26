@@ -2,6 +2,7 @@ import { deleteItemAsync, getItemAsync, setItemAsync } from "../utils/storage";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const REQUEST_TIMEOUT_MS = 10000;
+const TTS_REQUEST_TIMEOUT_MS = 90000;
 const TOKEN_READ_TIMEOUT_MS = 1500;
 
 if (!BASE_URL) {
@@ -32,7 +33,11 @@ async function getStoredToken() {
 async function request(path, { method = "GET", body, headers } = {}) {
   const token = await getStoredToken();
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutMs =
+    String(method).toUpperCase() === "POST" && path === "/voice/speak"
+      ? TTS_REQUEST_TIMEOUT_MS
+      : REQUEST_TIMEOUT_MS;
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   let res;
   try {
@@ -106,6 +111,18 @@ export const api = {
     request(`/learning-paths/patient-sessions/${slug}`, { headers }),
   sendPreceptorChatMessage: (slug, payload, headers) =>
     request(`/learning-paths/patient-sessions/${slug}/preceptor-chat`, {
+      method: "POST",
+      body: payload,
+      headers,
+    }),
+  transcribeVoice: (payload, headers) =>
+    request("/voice/transcribe", {
+      method: "POST",
+      body: payload,
+      headers,
+    }),
+  speakVoice: (payload, headers) =>
+    request("/voice/speak", {
       method: "POST",
       body: payload,
       headers,

@@ -9,33 +9,37 @@ import {
   ScrollView,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
-  Image
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useAuth, useUser } from "@clerk/clerk-expo";
 import { Audio } from "expo-av";
-import { VideoView, useVideoPlayer } from "expo-video";
 import * as FileSystem from "expo-file-system/legacy";
 import { caseStyles } from "../../assets/styles/case.styles";
+import { AnimatedPatientAvatar, AnimatedPatientAvatarState } from "../../src/components/AnimatedPatientAvatar";
+import { ClinicalsChatComposer } from "../../src/components/ClinicalsChatComposer";
+import { MentorAvatar } from "../../src/components/MentorAvatar";
+import { useEnglishSpeechTranscription } from "../../src/hooks/useEnglishSpeechTranscription";
+import { useSpeechPlayback } from "../../src/hooks/useSpeechPlayback";
+import { useVoicePreference } from "../../src/hooks/useVoicePreference";
 import { deleteItemAsync, getItemAsync, setItemAsync } from "../../src/utils/storage";
 import { sessionDisplayTitle } from "../../src/utils/clinicalDisplay";
+import {
+  getPatientStateImageSource,
+  getPatientTalkingVideoSource,
+  getPatientVisualAssetKey,
+} from "../../src/utils/patientAssets";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 const API_PREFIX = "/api";
 const DEFAULT_REQUEST_TIMEOUT_MS = 45000;
 const SUBMIT_REQUEST_TIMEOUT_MS = 240000;
 const TTS_REQUEST_TIMEOUT_MS = 90000;
-const VOICE_PREF_KEY = "voice_output_enabled";
-
-const PATIENT_IMAGES: Record<string, any> = {
-  uti_level1: require("../../assets/patients/uti_level1.png"),
-};
-const PATIENT_TALKING_VIDEO_LOOPS: Record<string, any> = {
-  // Replace this file with a SadTalker output clip for more natural motion.
-  uti_level1: require("../../assets/patients/uti_level1_talk_loop.mp4"),
-};
+const SHOW_PATIENT_AVATAR_RUNTIME_DEBUG = __DEV__;
+const MENTOR_TTS_VOICE =
+  process.env.EXPO_PUBLIC_NAVIGATOR_MENTOR_TTS_VOICE || "am_adam";
 
 function getMimeTypeFromRecordingUri(uri: string) {
   const normalized = String(uri || "").toLowerCase();
@@ -55,6 +59,16 @@ function getRequestTimeoutMs(path: string, method: string) {
     return TTS_REQUEST_TIMEOUT_MS;
   }
   return DEFAULT_REQUEST_TIMEOUT_MS;
+}
+
+function createAudioBlobUrl(audioBase64: string, mimeType: string) {
+  const binary = window.atob(audioBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  const blob = new Blob([bytes], { type: mimeType || "audio/mpeg" });
+  return URL.createObjectURL(blob);
 }
 
 async function request(
@@ -246,6 +260,25 @@ function statusLabel(status: string) {
   return "Missed";
 }
 
+const VISIT_TYPE_LABELS: Record<string, string> = {
+  telehealth_outpatient: "📹 Telehealth",
+  primary_care: "🏥 Primary Care",
+  emergency_department: "🚑 Emergency Department",
+  urgent_care: "🩺 Urgent Care",
+  hospital_room: "🛏 Hospital Room",
+  virtual_followup: "💻 Virtual Follow-up",
+};
+
+function formatVisitType(setting?: string | null) {
+  if (!setting) return "";
+  if (VISIT_TYPE_LABELS[setting]) return VISIT_TYPE_LABELS[setting];
+  return String(setting)
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function normalizeSubmissionPayload(payload: any): SubmissionResult {
   const details = payload?.details && typeof payload.details === "object" ? payload.details : {};
   const score = Number(payload?.score ?? details?.score ?? 0) || 0;
@@ -375,6 +408,22 @@ function summarizeCriteriaAchievement(
 export default function Level1Screen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isNarrowScreen = width < 720;
+  const encounterFooterStyle = useMemo(
+    () => [
+      caseStyles.encounterFooter,
+      isNarrowScreen ? caseStyles.encounterFooterCompact : caseStyles.encounterFooterDesktop,
+    ],
+    [isNarrowScreen]
+  );
+  const hpiStageStyle = useMemo(
+    () => [
+      caseStyles.hpiStageContainer,
+      isNarrowScreen ? caseStyles.hpiStageContainerCompact : caseStyles.hpiStageContainerDesktop,
+    ],
+    [isNarrowScreen]
+  );
   const caseId = useMemo(() => {
     const raw = params.caseId;
     return Array.isArray(raw) ? raw[0] : raw || "uti_level1";
@@ -393,13 +442,6 @@ export default function Level1Screen() {
     () => `conv_${patientSessionSlug || caseId}`,
     [caseId, patientSessionSlug]
   );
-  const patientImage = PATIENT_IMAGES[caseId] || PATIENT_IMAGES.uti_level1;
-  const patientTalkingVideoLoop =
-    PATIENT_TALKING_VIDEO_LOOPS[caseId] || PATIENT_TALKING_VIDEO_LOOPS.uti_level1;
-  const avatarVideoPlayer = useVideoPlayer(patientTalkingVideoLoop, (player) => {
-    player.loop = true;
-    player.muted = true;
-  });
 
   const [loadingCase, setLoadingCase] = useState(true);
   const [sending, setSending] = useState(false);
@@ -423,15 +465,29 @@ export default function Level1Screen() {
   const [debriefInput, setDebriefInput] = useState("");
   const [debriefSending, setDebriefSending] = useState(false);
   const [debriefError, setDebriefError] = useState<string | null>(null);
+  const debriefTranscription = useEnglishSpeechTranscription({
+    onText: setDebriefInput,
+    onError: () => setDebriefError("Could not transcribe audio. Please try again or type your question."),
+  });
+  const debriefMentorSpeech = useSpeechPlayback({
+    voice: MENTOR_TTS_VOICE,
+    onError: () => {
+      // Keep debrief chat usable when mentor TTS is unavailable.
+    },
+  });
   const [showDetailedRubric, setShowDetailedRubric] = useState(false);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [savedConversationId, setSavedConversationId] = useState<string | null>(null);
   const [resumeCheckComplete, setResumeCheckComplete] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const { voiceEnabled, setVoiceEnabled } = useVoicePreference();
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [patientVisualSpeaking, setPatientVisualSpeaking] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const soundFilePathRef = useRef<string | null>(null);
+  const webAudioRef = useRef<HTMLAudioElement | null>(null);
+  const webAudioUrlRef = useRef<string | null>(null);
+  const patientVisualSpeakingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceEnabledRef = useRef(true);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
@@ -528,6 +584,7 @@ export default function Level1Screen() {
         body: {
           audio_base64: audioBase64,
           mime_type: "audio/webm",
+          language: "en",
         },
       });
 
@@ -573,6 +630,7 @@ export default function Level1Screen() {
         body: {
           audio_base64: audioBase64,
           mime_type: "audio/webm",
+          language: "en",
         },
       });
 
@@ -628,6 +686,7 @@ export default function Level1Screen() {
         body: {
           audio_base64: audioBase64,
           mime_type: getMimeTypeFromRecordingUri(uri),
+          language: "en",
         },
       });
 
@@ -656,7 +715,60 @@ export default function Level1Screen() {
     return headers;
   }, [authUserId, user]);
 
-  const stopSpeechPlayback = useCallback(async () => {
+  const clearPatientVisualSpeakingTimer = useCallback(() => {
+    const timer = patientVisualSpeakingTimerRef.current;
+    patientVisualSpeakingTimerRef.current = null;
+    if (timer) clearTimeout(timer);
+  }, []);
+
+  const startPatientVisualSpeaking = useCallback(
+    () => {
+      clearPatientVisualSpeakingTimer();
+      setPatientVisualSpeaking(true);
+      if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+        console.debug("[Level1 patient speech] start", {
+          patientSessionSlug,
+          caseId,
+        });
+      }
+    },
+    [caseId, clearPatientVisualSpeakingTimer, patientSessionSlug]
+  );
+
+  const stopPatientVisualSpeaking = useCallback(() => {
+    clearPatientVisualSpeakingTimer();
+    setPatientVisualSpeaking(false);
+    if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+      console.debug("[Level1 patient speech] end", {
+        patientSessionSlug,
+        caseId,
+      });
+    }
+  }, [caseId, clearPatientVisualSpeakingTimer, patientSessionSlug]);
+
+  const stopSpeechPlayback = useCallback(async ({ stopVisual = true }: { stopVisual?: boolean } = {}) => {
+    const currentWebAudio = webAudioRef.current;
+    webAudioRef.current = null;
+    if (currentWebAudio) {
+      try {
+        currentWebAudio.pause();
+        currentWebAudio.removeAttribute("src");
+        currentWebAudio.load();
+      } catch {
+        // noop
+      }
+    }
+
+    const currentWebAudioUrl = webAudioUrlRef.current;
+    webAudioUrlRef.current = null;
+    if (currentWebAudioUrl) {
+      try {
+        URL.revokeObjectURL(currentWebAudioUrl);
+      } catch {
+        // noop
+      }
+    }
+
     const currentSound = soundRef.current;
     soundRef.current = null;
 
@@ -684,7 +796,10 @@ export default function Level1Screen() {
     }
 
     setIsSpeaking(false);
-  }, []);
+    if (stopVisual) {
+      stopPatientVisualSpeaking();
+    }
+  }, [stopPatientVisualSpeaking]);
 
   const speakAssistantReply = useCallback(
     async (text: string) => {
@@ -694,75 +809,225 @@ export default function Level1Screen() {
       if (!inputText) return;
 
       try {
-        await stopSpeechPlayback();
+        await stopSpeechPlayback({ stopVisual: false });
+
+        if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+          console.debug("[Level1 TTS] attempt start", {
+            patientSessionSlug,
+            caseId,
+          });
+        }
 
         const payload = await request("/voice/speak", {
           method: "POST",
           body: { text: inputText },
         });
 
-const audioBase64 = String(payload?.audio_base64 || "").trim();
-if (!audioBase64) return;
+        const audioBase64 = String(payload?.audio_base64 || "").trim();
+        const mimeType = String(payload?.mime_type || "audio/mpeg").toLowerCase();
 
-const mimeType = String(payload?.mime_type || "audio/mpeg").toLowerCase();
+        if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+          console.debug("[Level1 TTS] response received", {
+            patientSessionSlug,
+            caseId,
+            hasAudioBase64: Boolean(audioBase64),
+            audioBase64Length: audioBase64.length,
+            mimeType,
+          });
+        }
 
-if (Platform.OS === "web") {
-  const audioUri = `data:${mimeType};base64,${audioBase64}`;
-  const audio = new window.Audio(audioUri);
+        if (!audioBase64) {
+          if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+            console.debug("[Level1 TTS] empty audio response; keeping avatar still", {
+              patientSessionSlug,
+              caseId,
+            });
+          }
+          stopPatientVisualSpeaking();
+          return;
+        }
 
-  setIsSpeaking(true);
+        if (Platform.OS === "web") {
+          const audioUrl = createAudioBlobUrl(audioBase64, mimeType);
+          const audio = new window.Audio(audioUrl);
+          audio.volume = 1.0;
+          audio.muted = false;
+          webAudioUrlRef.current = audioUrl;
+          webAudioRef.current = audio;
 
-  audio.onended = () => {
-    setIsSpeaking(false);
-  };
+          if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+            console.debug("[Level1 TTS] web audio object created", {
+              patientSessionSlug,
+              caseId,
+              audioUrl,
+              volume: audio.volume,
+              muted: audio.muted,
+            });
+          }
 
-  audio.onerror = () => {
-    setIsSpeaking(false);
-    console.warn("Failed to play web patient voice.");
-  };
+          audio.onended = () => {
+            if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+              console.debug("[Level1 TTS] web playback ended", {
+                patientSessionSlug,
+                caseId,
+                paused: audio.paused,
+                ended: audio.ended,
+                volume: audio.volume,
+                muted: audio.muted,
+              });
+            }
+            setIsSpeaking(false);
+            stopPatientVisualSpeaking();
+            webAudioRef.current = null;
+            if (webAudioUrlRef.current) {
+              URL.revokeObjectURL(webAudioUrlRef.current);
+              webAudioUrlRef.current = null;
+            }
+          };
 
-  await audio.play();
-  return;
-}
+          audio.onerror = () => {
+            if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+              console.debug("[Level1 TTS] web playback error; keeping avatar still", {
+                patientSessionSlug,
+                caseId,
+                error: audio.error?.message || audio.error?.code || null,
+                volume: audio.volume,
+                muted: audio.muted,
+              });
+            }
+            setIsSpeaking(false);
+            stopPatientVisualSpeaking();
+          };
 
-const extension = mimeType.includes("wav") ? "wav" : "mp3";
-const baseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
-if (!baseDir) {
-  throw new Error("No writable filesystem directory for audio playback.");
-}
+          startPatientVisualSpeaking();
+          setIsSpeaking(true);
+          await audio.play();
 
-const filePath = `${baseDir}tts-${Date.now()}.${extension}`;
-await FileSystem.writeAsStringAsync(filePath, audioBase64, {
-  encoding: FileSystem.EncodingType.Base64,
-});
+          if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+            console.debug("[Level1 TTS] web playback started", {
+              patientSessionSlug,
+              caseId,
+              paused: audio.paused,
+              ended: audio.ended,
+              volume: audio.volume,
+              muted: audio.muted,
+            });
+          }
+          return;
+        }
 
-soundFilePathRef.current = filePath;
-const { sound } = await Audio.Sound.createAsync(
-  { uri: filePath },
-  { shouldPlay: true }
-);
+        const extension = mimeType.includes("wav") ? "wav" : "mp3";
+        const baseDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+        if (!baseDir) {
+          throw new Error("No writable filesystem directory for audio playback.");
+        }
+
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+        }).catch(() => {});
+
+        const filePath = `${baseDir}tts-${Date.now()}.${extension}`;
+        await FileSystem.writeAsStringAsync(filePath, audioBase64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+          console.debug("[Level1 TTS] audio file written", {
+            patientSessionSlug,
+            caseId,
+            filePath,
+            mimeType,
+          });
+        }
+
+        soundFilePathRef.current = filePath;
+        const { sound } = await Audio.Sound.createAsync(
+          { uri: filePath },
+          { shouldPlay: false, volume: 1.0, isMuted: false }
+        );
+
+        if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+          console.debug("[Level1 TTS] playback object created", {
+            patientSessionSlug,
+            caseId,
+          });
+        }
 
         soundRef.current = sound;
+        startPatientVisualSpeaking();
         setIsSpeaking(true);
+        const playbackStatus = await sound.playAsync();
+        if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+          console.debug("[Level1 TTS] native playback started", {
+            patientSessionSlug,
+            caseId,
+            isLoaded: playbackStatus.isLoaded,
+            isPlaying: playbackStatus.isLoaded ? playbackStatus.isPlaying : false,
+            didJustFinish: playbackStatus.isLoaded ? playbackStatus.didJustFinish : false,
+            volume: playbackStatus.isLoaded ? playbackStatus.volume : null,
+            isMuted: playbackStatus.isLoaded ? playbackStatus.isMuted : null,
+            error: playbackStatus.isLoaded ? null : playbackStatus.error,
+          });
+        }
 
         sound.setOnPlaybackStatusUpdate((status) => {
           if (!status.isLoaded) {
             if (status.error) {
+              if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+                console.debug("[Level1 TTS] native error; keeping avatar still", {
+                  patientSessionSlug,
+                  caseId,
+                });
+              }
               setIsSpeaking(false);
+              stopPatientVisualSpeaking();
             }
             return;
           }
 
+          if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG && (status.isPlaying || status.didJustFinish)) {
+            console.debug("[Level1 TTS] native status", {
+              patientSessionSlug,
+              caseId,
+              isLoaded: status.isLoaded,
+              isPlaying: status.isPlaying,
+              didJustFinish: status.didJustFinish,
+              volume: status.volume,
+              isMuted: status.isMuted,
+            });
+          }
+
           if (status.didJustFinish) {
+            if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+              console.debug("[Level1 TTS] native end", {
+                patientSessionSlug,
+                caseId,
+              });
+            }
             void stopSpeechPlayback();
           }
         });
       } catch (err) {
         console.warn("Failed to play patient voice:", err);
-        await stopSpeechPlayback();
+        if (SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) {
+          console.debug("[Level1 TTS] error; keeping avatar still", {
+            patientSessionSlug,
+            caseId,
+          });
+        }
+        setIsSpeaking(false);
+        stopPatientVisualSpeaking();
+        await stopSpeechPlayback({ stopVisual: false });
       }
-    },
-    [stopSpeechPlayback]
+    }, 
+    [
+      caseId,
+      patientSessionSlug,
+      startPatientVisualSpeaking,
+      stopPatientVisualSpeaking,
+      stopSpeechPlayback,
+    ]
   );
 
   const queueMessage = useCallback((msg: Msg) => {
@@ -907,48 +1172,47 @@ const { sound } = await Audio.Sound.createAsync(
   }, [caseId, conversationStorageKey, patientSessionSlug, userHeaders]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      const savedPref = await getItemAsync(VOICE_PREF_KEY);
-      if (cancelled || savedPref == null) return;
-      setVoiceEnabled(savedPref !== "0");
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    setItemAsync(VOICE_PREF_KEY, voiceEnabled ? "1" : "0").catch(() => {});
-  }, [voiceEnabled]);
-
-  useEffect(() => {
     voiceEnabledRef.current = voiceEnabled;
   }, [voiceEnabled]);
 
-  const shouldPlayTalkingVideo = isSpeaking && stage === "chat" && voiceEnabled;
-  const safelySetTalkingVideoState = useCallback(
-    (shouldPlay: boolean) => {
-      try {
-        if (shouldPlay) {
-          avatarVideoPlayer.play();
-          return;
-        }
-
-        avatarVideoPlayer.pause();
-        avatarVideoPlayer.currentTime = 0;
-      } catch {
-        // Can happen during unmount/fast-refresh when native player is already disposed.
-      }
-    },
-    [avatarVideoPlayer]
-  );
+  const patientAvatarState: AnimatedPatientAvatarState =
+    patientVisualSpeaking && voiceEnabled && stage === "chat"
+      ? "talking"
+      : isRecording
+      ? "listening"
+      : sending || transcribing
+      ? "thinking"
+      : "idle";
 
   useEffect(() => {
-    safelySetTalkingVideoState(shouldPlayTalkingVideo);
-  }, [safelySetTalkingVideoState, shouldPlayTalkingVideo]);
+    if (!SHOW_PATIENT_AVATAR_RUNTIME_DEBUG) return;
+    console.debug("[Level1 avatar state]", {
+      patientSessionSlug,
+      caseId,
+      avatarState: patientAvatarState,
+      isSpeaking,
+      patientVisualSpeaking,
+      voiceEnabled,
+      stage,
+      hasTalkingAsset: Boolean(getPatientTalkingVideoSource({ patientSessionSlug, caseId })),
+      hasTalkingStill: Boolean(
+        getPatientStateImageSource({
+          patientSessionSlug,
+          caseId,
+          state: "talking",
+        })
+      ),
+      resolvedAssetKey: getPatientVisualAssetKey({ patientSessionSlug, caseId }),
+    });
+  }, [
+    caseId,
+    isSpeaking,
+    patientAvatarState,
+    patientSessionSlug,
+    patientVisualSpeaking,
+    stage,
+    voiceEnabled,
+  ]);
 
   useEffect(() => {
     if (stage !== "chat") {
@@ -969,10 +1233,9 @@ const { sound } = await Audio.Sound.createAsync(
       if (recording) {
         recording.stopAndUnloadAsync().catch(() => {});
       }
-      safelySetTalkingVideoState(false);
       void stopSpeechPlayback();
     };
-  }, [safelySetTalkingVideoState, stopSpeechPlayback]);
+  }, [stopSpeechPlayback]);
 
   useEffect(() => {
     if (!resumeCheckComplete) return;
@@ -1241,6 +1504,9 @@ const { sound } = await Audio.Sound.createAsync(
       setDebriefInput("");
       setDebriefError(null);
       setDebriefSending(true);
+      if (debriefMentorSpeech.isSpeaking) {
+        void debriefMentorSpeech.stop();
+      }
 
       try {
         const data = await request(`/conversations/${conversationId}/debrief-chat`, {
@@ -1252,22 +1518,34 @@ const { sound } = await Audio.Sound.createAsync(
           },
         });
         const reply = String(data?.reply || "").trim();
+        const assistantReply =
+          reply ||
+          "Review your report, choose one specific area to practice, and ask me about that skill.";
         setDebriefMessages((current) => [
           ...current,
           {
             role: "assistant",
-            content:
-              reply ||
-              "Review your report, choose one specific area to practice, and ask me about that skill.",
+            content: assistantReply,
           },
         ]);
+        if (voiceEnabled) {
+          void debriefMentorSpeech.speak(assistantReply);
+        }
       } catch (err: any) {
         setDebriefError(err?.message || "Dr. Martinez could not respond right now.");
       } finally {
         setDebriefSending(false);
       }
     },
-    [conversationId, debriefInput, debriefMessages, debriefSending, userHeaders]
+    [
+      conversationId,
+      debriefInput,
+      debriefMessages,
+      debriefMentorSpeech,
+      debriefSending,
+      userHeaders,
+      voiceEnabled,
+    ]
   );
 
   const continueLearning = useCallback(() => {
@@ -1432,7 +1710,13 @@ const { sound } = await Audio.Sound.createAsync(
               <ScrollView contentContainerStyle={caseStyles.debriefScrollContent}>
                 <View style={caseStyles.debriefHeaderRow}>
                   <View style={caseStyles.debriefAvatarCircle}>
-                    <Text style={caseStyles.debriefAvatarText}>DM</Text>
+                    <MentorAvatar
+                      mentorName="Dr. Martinez"
+                      mentorSlug="dr-martinez"
+                      isSpeaking={debriefMentorSpeech.isSpeaking}
+                      showDecorations={false}
+                      size={48}
+                    />
                   </View>
                   <View style={caseStyles.debriefHeaderText}>
                     <Text style={caseStyles.debriefEyebrow}>Dr. Martinez Debrief</Text>
@@ -1441,7 +1725,27 @@ const { sound } = await Audio.Sound.createAsync(
                 </View>
 
                 <View style={caseStyles.debriefChatBox}>
-                  <Text style={caseStyles.debriefSectionTitle}>Ask Dr. Martinez</Text>
+                  <View style={caseStyles.debriefVoiceHeader}>
+                    <Text style={caseStyles.debriefSectionTitle}>Ask Dr. Martinez</Text>
+                    <View style={caseStyles.debriefVoiceControls}>
+                      <Pressable
+                        onPress={() => {
+                          if (voiceEnabled) {
+                            void debriefMentorSpeech.stop();
+                          }
+                          setVoiceEnabled((current) => !current);
+                        }}
+                        style={({ pressed }) => [
+                          caseStyles.debriefVoiceToggle,
+                          { opacity: pressed ? 0.75 : 1 },
+                        ]}
+                      >
+                        <Text style={caseStyles.debriefVoiceToggleText}>
+                          {voiceEnabled ? "Voice: On" : "Voice: Off"}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
                   <View style={caseStyles.debriefChatMessages}>
                     <View
                       style={[
@@ -1500,36 +1804,24 @@ const { sound } = await Audio.Sound.createAsync(
                   ) : null}
                   {debriefError ? <Text style={caseStyles.errorText}>{debriefError}</Text> : null}
 
-                  <View style={caseStyles.debriefChatInputRow}>
-                    <TextInput
-                      value={debriefInput}
-                      onChangeText={setDebriefInput}
-                      editable={!debriefSending}
-                      placeholder="Ask Dr. Martinez about your report..."
-                      style={caseStyles.debriefChatInput}
-                      returnKeyType="send"
-                      onSubmitEditing={() => sendDebriefMessage()}
-                    />
-                    <Pressable
-                      onPress={() => sendDebriefMessage()}
-                      disabled={debriefSending || !debriefInput.trim() || !conversationId}
-                      style={({ pressed }) => [
-                        caseStyles.debriefChatSendButton,
-                        {
-                          opacity:
-                            debriefSending || !debriefInput.trim() || !conversationId
-                              ? 0.45
-                              : pressed
-                              ? 0.75
-                              : 1,
-                        },
-                      ]}
-                    >
-                      <Text style={caseStyles.debriefChatSendText}>
-                        {debriefSending ? "..." : "Ask"}
-                      </Text>
-                    </Pressable>
-                  </View>
+                  <ClinicalsChatComposer
+                    value={debriefInput}
+                    onChangeText={setDebriefInput}
+                    editable={!debriefSending}
+                    placeholder="Ask Dr. Martinez about your report..."
+                    submitLabel="Ask"
+                    onSubmit={() => sendDebriefMessage()}
+                    sendDisabled={debriefSending || !debriefInput.trim() || !conversationId}
+                    sending={debriefSending}
+                    onMicPress={debriefTranscription.toggleRecording}
+                    micDisabled={
+                      debriefSending ||
+                      debriefTranscription.transcribing ||
+                      debriefTranscription.recordingBusy
+                    }
+                    transcribing={debriefTranscription.transcribing}
+                    isRecording={debriefTranscription.isRecording}
+                  />
                 </View>
 
                 <View style={caseStyles.debriefReportDivider}>
@@ -1594,68 +1886,53 @@ const { sound } = await Audio.Sound.createAsync(
         <View style={caseStyles.header}>
           <View style={caseStyles.avatarWrapper}>
             <View style={caseStyles.avatarClip}>
-              {shouldPlayTalkingVideo ? (
-                <VideoView
-                  player={avatarVideoPlayer}
-                  style={caseStyles.avatarVideo}
-                  contentFit="cover"
-                  nativeControls={false}
-                  allowsPictureInPicture={false}
-                />
-              ) : (
-                <Image
-                  source={patientImage}
-                  style={caseStyles.avatar}
-                  resizeMode="cover"
-                />
-              )}
+              <AnimatedPatientAvatar
+                patientName={sessionDisplayTitle({
+                  slug: patientSessionSlug || undefined,
+                  title: caseData?.display_title || undefined,
+                })}
+                patientSessionSlug={patientSessionSlug}
+                caseId={caseId}
+                state={patientAvatarState}
+                fill
+                borderRadius={22}
+              />
             </View>
           </View>
 
-          <Text style={caseStyles.title}>
-            Level {caseData?.level ?? "?"} 
-          </Text>
-
-          {!!caseData?.setting && (
-            <Text style={caseStyles.subText}>
-              Setting: {caseData.setting}
-            </Text>
-          )}
-
-          {!!caseData?.presenting_info?.chief_complaint && (
-            <Text style={caseStyles.subText}>
-              Chief complaint: {caseData.presenting_info.chief_complaint}
-            </Text>
-          )}
-
-          {stage === "chat" && (
-            <View style={caseStyles.voiceControlsRow}>
-              <Pressable
-                onPress={async () => {
-                  if (voiceEnabled) {
-                    await stopSpeechPlayback();
-                  }
-                  setVoiceEnabled((prev) => !prev);
-                }}
-                style={({ pressed }) => ({
-                  ...caseStyles.voiceToggleButton,
-                  opacity: pressed ? 0.75 : 1,
-                })}
-              >
-                <Text style={caseStyles.voiceToggleText}>
-                  {voiceEnabled ? "Voice: On" : "Voice: Off"}
-                </Text>
-              </Pressable>
-
-              {voiceEnabled ? (
-                <Text style={caseStyles.voiceStateText}>
-                  {isSpeaking ? "Patient speaking..." : "Patient voice ready"}
-                </Text>
-              ) : (
-                <Text style={caseStyles.voiceStateText}>Text only mode</Text>
+          <View style={caseStyles.patientMetaCard}>
+            <View style={caseStyles.patientMetaHeader}>
+              <Text style={caseStyles.patientMetaEyebrow}>Patient Encounter</Text>
+              {stage === "chat" && (
+                <Pressable
+                  onPress={async () => {
+                    if (voiceEnabled) {
+                      await stopSpeechPlayback();
+                    }
+                    setVoiceEnabled((prev) => !prev);
+                  }}
+                  style={({ pressed }) => ({
+                    ...caseStyles.voiceToggleButton,
+                    opacity: pressed ? 0.75 : 1,
+                  })}
+                >
+                  <Text style={caseStyles.voiceToggleText}>
+                    {voiceEnabled ? "Voice: On" : "Voice: Off"}
+                  </Text>
+                </Pressable>
               )}
             </View>
-          )}
+
+            {!!caseData?.setting && (
+              <Text style={caseStyles.patientMetaValue}>{formatVisitType(caseData.setting)}</Text>
+            )}
+
+            {!!caseData?.presenting_info?.chief_complaint && (
+              <Text style={caseStyles.patientConcernValue}>
+                {caseData.presenting_info.chief_complaint}
+              </Text>
+            )}
+          </View>
         </View>
 
         {stage === "results" && submissionResult ? (
@@ -1854,10 +2131,11 @@ const { sound } = await Audio.Sound.createAsync(
             )}
           />
         ) : (
-          <>
+          <View style={caseStyles.encounterBody}>
             {/* Chat */}
             <FlatList
               ref={listRef}
+              style={caseStyles.chatList}
               data={messages}
               keyExtractor={(m) => m.id}
               contentContainerStyle={caseStyles.chatContainer}
@@ -1867,6 +2145,7 @@ const { sound } = await Audio.Sound.createAsync(
                   <View
                     style={[
                       caseStyles.messageBubble,
+                      isUser ? caseStyles.messageBubbleUser : caseStyles.messageBubblePatient,
                       { alignSelf: isUser ? "flex-end" : "flex-start" },
                     ]}
                   >
@@ -1890,43 +2169,20 @@ const { sound } = await Audio.Sound.createAsync(
             )}
 
             {stage === "chat" ? (
-              <>
-                {/* Input */}
-                <View style={caseStyles.inputContainer}>
-                  <TextInput
-                    value={input}
-                    onChangeText={setInput}
-                    placeholder="Ask the patient a question..."
-                    style={caseStyles.textInput}
-                    editable={!sending}
-                    returnKeyType="send"
-                    onSubmitEditing={send}
-                  />
-                  <Pressable
-                    onPress={isRecording ? stopRecordingAndTranscribe : startRecording}
-                    disabled={sending || transcribing || recordingBusy}
-                    style={({ pressed }) => ({
-                      ...caseStyles.sendButton,
-                      opacity:
-                        sending || transcribing || recordingBusy ? 0.4 : pressed ? 0.6 : 1,
-                      marginRight: 4,
-                    })}
-                  >
-                    <Text style={caseStyles.buttonText}>
-                      {transcribing ? "..." : isRecording ? "⏹️" : "🎤"}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={send}
-                    disabled={sending || !input.trim()}
-                    style={({ pressed }) => ({
-                      ...caseStyles.sendButton,
-                      opacity: sending || !input.trim() ? 0.4 : pressed ? 0.6 : 1,
-                    })}
-                  >
-                    <Text style={caseStyles.buttonText}>{sending ? "..." : "Send"}</Text>
-                  </Pressable>
-                </View>
+              <View style={encounterFooterStyle}>
+                <ClinicalsChatComposer
+                  value={input}
+                  onChangeText={setInput}
+                  placeholder="Ask the patient a question..."
+                  editable={!sending}
+                  onMicPress={isRecording ? stopRecordingAndTranscribe : startRecording}
+                  micDisabled={sending || transcribing || recordingBusy}
+                  transcribing={transcribing}
+                  isRecording={isRecording}
+                  onSend={send}
+                  sendDisabled={sending || !input.trim()}
+                  sending={sending}
+                />
 
                 <View style={caseStyles.doneButtonContainer}>
                   <Pressable
@@ -1943,9 +2199,9 @@ const { sound } = await Audio.Sound.createAsync(
                     </Text>
                   </Pressable>
                 </View>
-              </>
+              </View>
             ) : (
-              <View style={caseStyles.hpiStageContainer}>
+              <View style={hpiStageStyle}>
                 <View style={caseStyles.hpiCard}>
                   <Text style={caseStyles.hpiTitle}>Final HPI (4-5 sentences)</Text>
                   <Text style={caseStyles.hpiSubText}>
@@ -1998,7 +2254,7 @@ const { sound } = await Audio.Sound.createAsync(
                 </View>
               </View>
             )}
-          </>
+          </View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -4,40 +4,50 @@ import { COLORS } from "../../constants/colors";
 export const caseStyles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: "#ffffff",
   },
 
   header: {
-    padding: 16,
-    gap: 5,
-    alignItems: "center",
-    marginBottom: 5,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
+    gap: 10,
+    alignItems: "stretch",
+    marginBottom: 2,
+    flexShrink: 0,
   },
 
   avatarWrapper: {
     position: "relative",
-    borderRadius: 60,
-    backgroundColor: "#fff",
+    width: "100%",
+    maxWidth: 820,
+    aspectRatio: 16 / 9,
+    alignSelf: "center",
+    borderRadius: 22,
+    backgroundColor: "#111827",
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
 
     // iOS shadow
-    shadowColor: "#000",
+    shadowColor: "#6d28d9",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
 
     // Android 
     elevation: 6,
   },
 
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: "100%",
+    height: "100%",
   },
   avatarClip: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: "100%",
+    height: "100%",
+    borderRadius: 22,
     overflow: "hidden",
+    backgroundColor: "#111827",
   },
   avatarVideo: {
     width: "100%",
@@ -45,44 +55,102 @@ export const caseStyles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 20,
-    fontWeight: "700",
-    textAlign: "center",
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#111827",
   },
 
   subText: {
-    opacity: 0.7,
-    textAlign: "center",
+    color: "#4b5563",
+    lineHeight: 19,
+    fontWeight: "600",
   },
 
-  voiceControlsRow: {
+  patientMetaCard: {
     width: "100%",
-    marginTop: 8,
+    maxWidth: 820,
+    alignSelf: "center",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#ffffff",
+    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    gap: 4,
+  },
+
+  patientMetaHeader: {
+    flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  patientMetaEyebrow: {
+    color: "#6d28d9",
+    fontSize: 12,
+    fontWeight: "800",
+    textTransform: "uppercase",
+  },
+
+  patientMetaValue: {
+    color: "#4b5563",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+
+  patientConcernValue: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 20,
   },
 
   voiceToggleButton: {
     borderWidth: 1,
+    borderColor: "#ddd6fe",
     borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: "#f8fafc",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    backgroundColor: "#faf5ff",
   },
 
   voiceToggleText: {
-    fontWeight: "700",
-    color: "#1f2937",
-  },
-
-  voiceStateText: {
-    color: "#6b7280",
+    fontWeight: "800",
+    color: "#6d28d9",
     fontSize: 12,
   },
 
   chatContainer: {
     paddingHorizontal: 16,
-    paddingBottom: 12,
+    paddingTop: 4,
+    paddingBottom: 14,
+    flexGrow: 1,
+  },
+
+  encounterBody: {
+    flex: 1,
+    minHeight: 0,
+  },
+
+  chatList: {
+    flex: 1,
+    minHeight: 0,
+  },
+
+  encounterFooter: {
+    flexShrink: 0,
+    backgroundColor: "#ffffff",
+    borderTopWidth: 1,
+    borderTopColor: "#f3f4f6",
+  },
+
+  encounterFooterCompact: {
+    paddingBottom: 14,
+  },
+
+  encounterFooterDesktop: {
+    paddingBottom: 76,
   },
 
   messageBubble: {
@@ -90,32 +158,20 @@ export const caseStyles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderRadius: 12,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
     marginBottom: 10,
-    backgroundColor: "#fbfcfd",
+    backgroundColor: "#ffffff",
   },
 
-  inputContainer: {
-    padding: 12,
-    borderTopWidth: 1,
-    flexDirection: "row",
-    gap: 10,
-    alignItems: "center",
+  messageBubblePatient: {
+    backgroundColor: "#ffffff",
+    borderColor: "#e5e7eb",
   },
 
-  textInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-
-  sendButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderRadius: 10,
+  messageBubbleUser: {
+    backgroundColor: "#eef2ff",
+    borderColor: "#c7d2fe",
   },
 
   // Results screen
@@ -378,13 +434,16 @@ export const caseStyles = StyleSheet.create({
   // HPI stage
   hpiCard: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderColor: "#ddd6fe",
+    borderRadius: 8,
     padding: 12,
+    backgroundColor: "#faf5ff",
   },
 
   hpiTitle: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
+    color: "#111827",
     marginBottom: 6,
   },
 
@@ -395,10 +454,13 @@ export const caseStyles = StyleSheet.create({
 
   hpiInput: {
     borderWidth: 1,
-    borderRadius: 10,
+    borderColor: "#ede9fe",
+    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
     minHeight: 120,
+    backgroundColor: "#ffffff",
+    color: "#111827",
   },
 
   hpiButtonRow: {
@@ -410,13 +472,16 @@ export const caseStyles = StyleSheet.create({
   outlineButton: {
     flex: 1,
     borderWidth: 1,
-    borderRadius: 10,
+    borderColor: "#6d28d9",
+    borderRadius: 8,
     paddingVertical: 12,
     alignItems: "center",
+    backgroundColor: "#6d28d9",
   },
 
   outlineButtonText: {
-    fontWeight: "700",
+    color: "#ffffff",
+    fontWeight: "800",
   },
 
   errorText: {
@@ -487,7 +552,7 @@ export const caseStyles = StyleSheet.create({
   // Results flat list
   resultsFlatListContent: {
     paddingHorizontal: 12,
-    paddingBottom: 20,
+    paddingBottom: 96,
   },
 
   resultsHeaderContainer: {
@@ -513,41 +578,59 @@ export const caseStyles = StyleSheet.create({
 
   // Chat messages
   messageSenderLabel: {
-    fontWeight: "700",
+    color: "#6d28d9",
+    fontSize: 12,
+    fontWeight: "800",
     marginBottom: 4,
+    textTransform: "uppercase",
   },
 
   // Empty chat hint
   chatHintContainer: {
-    paddingHorizontal: 12,
-    paddingBottom: 8,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    borderRadius: 8,
+    backgroundColor: "#faf5ff",
+    padding: 12,
   },
 
   chatHintText: {
-    color: "#555",
+    color: "#4b5563",
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
   },
 
   // Done interview button wrapper
   doneButtonContainer: {
     paddingHorizontal: 12,
+    paddingTop: 8,
     paddingBottom: 12,
+    backgroundColor: "#ffffff",
   },
 
   // HPI stage wrapper
   hpiStageContainer: {
     paddingHorizontal: 12,
-    paddingBottom: 12,
     gap: 10,
+    backgroundColor: "#ffffff",
+    flexShrink: 0,
+  },
+
+  hpiStageContainerCompact: {
+    paddingBottom: 14,
+  },
+
+  hpiStageContainerDesktop: {
+    paddingBottom: 76,
   },
 
   // Layout
   keyboardView: {
     flex: 1,
-  },
-
-  // Generic button label
-  buttonText: {
-    fontWeight: "700",
+    minHeight: 0,
   },
 
   gradingOverlay: {
@@ -685,6 +768,32 @@ export const caseStyles = StyleSheet.create({
     padding: 12,
     gap: 10,
     backgroundColor: "#ffffff",
+  },
+
+  debriefVoiceHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+
+  debriefVoiceControls: {
+    alignItems: "flex-end",
+  },
+
+  debriefVoiceToggle: {
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    backgroundColor: "#faf5ff",
+  },
+
+  debriefVoiceToggleText: {
+    color: "#6d28d9",
+    fontSize: 12,
+    fontWeight: "800",
   },
 
   debriefQuickActions: {

@@ -130,6 +130,9 @@ async function createRubricEval({ systemPrompt, userPrompt }) {
 }
 
 function getTtsConfig(overrides = {}) {
+  // Note: the current development NaviGator key only has access to
+  // granite-3.3-8b-instruct. Audio playback requires a key/model with TTS
+  // access, configured via NAVIGATOR_TTS_MODEL and NAVIGATOR_TTS_VOICE.
   const model = String(
     overrides.model ||
       process.env.NAVIGATOR_TTS_MODEL ||
@@ -151,6 +154,30 @@ function getTtsConfig(overrides = {}) {
   return { model, voice, speed };
 }
 
+function isDevelopment() {
+  return process.env.NODE_ENV !== "production";
+}
+
+function debugLog(...args) {
+  if (isDevelopment()) console.log(...args);
+}
+
+function debugError(...args) {
+  if (isDevelopment()) console.error(...args);
+}
+
+function sanitizeHeaders(headers) {
+  const result = {};
+  try {
+    headers.forEach((value, key) => {
+      result[key] = value;
+    });
+  } catch {
+    return result;
+  }
+  return result;
+}
+
 async function createSpeechAudio({ text, voice, speed, model }) {
   const input = String(text || "").trim();
   if (!input) {
@@ -168,6 +195,16 @@ async function createSpeechAudio({ text, voice, speed, model }) {
     speed: ttsConfig.speed
   };
 
+  debugLog("[NaviGator TTS] request", {
+    url: `${baseUrl}/v1/audio/speech`,
+    model: payload.model,
+    voice: payload.voice,
+    response_format: payload.response_format,
+    speed: payload.speed,
+    inputLength: input.length,
+    timeoutMs: getTtsTimeoutMs()
+  });
+
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), getTtsTimeoutMs());
   let response;
@@ -183,6 +220,9 @@ async function createSpeechAudio({ text, voice, speed, model }) {
       signal: controller.signal
     });
   } catch (err) {
+    debugError("[NaviGator TTS] fetch exception");
+    debugError(err);
+    debugError(err?.stack);
     if (err?.name === "AbortError") {
       throw new Error(`NaviGator TTS timed out after ${getTtsTimeoutMs()}ms`);
     }
@@ -191,25 +231,60 @@ async function createSpeechAudio({ text, voice, speed, model }) {
     clearTimeout(timeoutHandle);
   }
 
+  debugLog("[NaviGator TTS] response", {
+    status: response.status,
+    ok: response.ok,
+    headers: sanitizeHeaders(response.headers)
+  });
+
   if (!response.ok) {
     const textResponse = await response.text();
-    throw new Error(`NaviGator TTS error ${response.status}: ${textResponse}`);
+    const error = new Error(`NaviGator TTS error ${response.status}: ${textResponse}`);
+    error.status = response.status;
+    error.headers = sanitizeHeaders(response.headers);
+    error.responseBody = textResponse;
+    debugError("[NaviGator TTS] non-OK response", {
+      status: error.status,
+      headers: error.headers,
+      responseBody: error.responseBody
+    });
+    throw error;
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
+  debugLog("[NaviGator TTS] audio received", {
+    byteLength: buffer.length,
+    mimeType: response.headers.get("content-type") || "audio/mpeg"
+  });
+
   return {
     audioBase64: buffer.toString("base64"),
     mimeType: response.headers.get("content-type") || "audio/mpeg"
   };
 }
 
-async function transcribeAudio({ audioBuffer, mimeType = "audio/m4a", filename = "audio.m4a" }) {
+async function transcribeAudio({
+  audioBuffer,
+  mimeType = "audio/m4a",
+  filename = "audio.m4a",
+  language = "en"
+}) {
   const { apiKey, baseUrl } = getNavigatorConfig();
   const FormData = require("form-data");
+  const requestedLanguage = String(language || "en").trim().toLowerCase();
+  const transcriptionLanguage = requestedLanguage === "en" ? "en" : "en";
 
   const form = new FormData();
   form.append("file", audioBuffer, { filename, contentType: mimeType });
   form.append("model", process.env.NAVIGATOR_STT_MODEL);
+  form.append("language", transcriptionLanguage);
+  debugLog("[NaviGator STT] request", {
+    filename,
+    mimeType,
+    language: transcriptionLanguage,
+    model: process.env.NAVIGATOR_STT_MODEL || null,
+    byteLength: audioBuffer.length
+  });
 
   const timeoutMs = 60000;
   const controller = new AbortController();
@@ -241,7 +316,15 @@ async function transcribeAudio({ audioBuffer, mimeType = "audio/m4a", filename =
   }
 
   const data = await response.json();
-  return String(data?.text || "").trim();
+  const transcript = String(data?.text || "").trim();
+  debugLog("[NaviGator STT] response", {
+    language: data?.language || transcriptionLanguage,
+    transcriptPreview: transcript.slice(0, 120)
+  });
+  return {
+    text: transcript,
+    language: data?.language || transcriptionLanguage
+  };
 }
 
 module.exports = { createPatientReply, createRubricEval, createSpeechAudio, transcribeAudio };

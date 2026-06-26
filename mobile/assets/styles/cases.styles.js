@@ -584,6 +584,9 @@ export const casesStyles = StyleSheet.create({
     backgroundColor: "#ffffff",
     overflow: "hidden",
   },
+  preceptorModal: {
+    overflow: "visible",
+  },
   modalLoading: {
     minHeight: 220,
     justifyContent: "center",
@@ -592,6 +595,76 @@ export const casesStyles = StyleSheet.create({
   modalContent: {
     padding: 18,
     gap: 12,
+  },
+  preceptorModalContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  preceptorOverlay: {
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    position: "relative",
+    overflow: "visible",
+  },
+  preceptorHeroLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 3,
+    elevation: 3,
+    alignItems: "center",
+  },
+  preceptorHeroLayerCompact: {
+    top: 8,
+  },
+  preceptorCard: {
+    marginTop: 132,
+    maxHeight: "76%",
+    overflow: "visible",
+  },
+  preceptorCardCompact: {
+    marginTop: 116,
+    maxHeight: "80%",
+  },
+  preceptorHeroWrap: {
+    alignItems: "center",
+  },
+  preceptorFixedHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 92,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  preceptorDialoguePanel: {
+    height: 300,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    backgroundColor: "#ffffff",
+  },
+  preceptorDialoguePanelCompact: {
+    height: 190,
+  },
+  preceptorDialogueContent: {
+    padding: 12,
+    gap: 10,
+  },
+  preceptorFixedFooter: {
+    flexShrink: 0,
+    paddingTop: 10,
+    paddingBottom: 16,
+    paddingHorizontal: 12,
+    backgroundColor: "#ffffff",
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    gap: 10,
   },
   preceptorHeader: {
     flexDirection: "row",
@@ -613,6 +686,12 @@ export const casesStyles = StyleSheet.create({
   },
   preceptorHeaderText: {
     flex: 1,
+  },
+  preceptorIdentityRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 12,
   },
   preceptorName: {
     fontSize: 17,
@@ -801,9 +880,50 @@ export const casesStyles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     gap: 10,
+    backgroundColor: "#ffffff",
+  },
+  preceptorVoiceHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  preceptorVoiceControls: {
+    alignItems: "flex-end",
+  },
+  preceptorVoiceToggle: {
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    backgroundColor: "#faf5ff",
+  },
+  preceptorVoiceToggleText: {
+    color: "#6d28d9",
+    fontSize: 12,
+    fontWeight: "800",
   },
   preceptorChatMessages: {
     gap: 8,
+  },
+  preceptorWelcomeCard: {
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    borderRadius: 8,
+    backgroundColor: "#faf5ff",
+    padding: 12,
+    gap: 6,
+  },
+  preceptorWelcomeTitle: {
+    color: "#111827",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  preceptorWelcomeText: {
+    color: "#374151",
+    fontWeight: "700",
+    lineHeight: 20,
   },
   preceptorChatMessageGroup: {
     gap: 8,
@@ -891,25 +1011,32 @@ export const casesStyles = StyleSheet.create({
   modalActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    alignItems: "center",
     gap: 10,
-    marginTop: 4,
+    marginTop: 0,
   },
   modalSecondaryButton: {
+    minHeight: 42,
     borderWidth: 1,
     borderColor: "#d1d5db",
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalSecondaryButtonText: {
     fontWeight: "800",
     color: "#374151",
   },
   modalPrimaryButton: {
+    minHeight: 42,
     backgroundColor: "#6d28d9",
     borderRadius: 8,
     paddingHorizontal: 16,
-    paddingVertical: 11,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalPrimaryButtonText: {
     fontWeight: "800",

@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useAuth, useClerk, useUser } from "@clerk/clerk-expo";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../../src/api/client";
@@ -225,8 +225,7 @@ function completedMasteryLabel(session: RoadmapSession) {
 }
 
 export default function HomeScreen() {
-  const { signOut } = useClerk();
-  const { userId: authUserId, sessionId } = useAuth();
+  const { userId: authUserId } = useAuth();
   const { user, isLoaded: userLoaded } = useUser();
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -244,7 +243,6 @@ export default function HomeScreen() {
   const focusSessionToken = Array.isArray(rawFocusSessionToken)
     ? rawFocusSessionToken[0]
     : rawFocusSessionToken;
-  const [signingOut, setSigningOut] = useState(false);
   const [loadingRoadmap, setLoadingRoadmap] = useState(true);
   const [roadmapError, setRoadmapError] = useState<string | null>(null);
   const [learningPaths, setLearningPaths] = useState<LearningPath[]>([]);
@@ -342,18 +340,6 @@ export default function HomeScreen() {
   useEffect(() => {
     loadRoadmap();
   }, [loadRoadmap]);
-
-  const handleSignOut = async () => {
-    if (signingOut) return;
-    setSigningOut(true);
-    try {
-      await signOut({ sessionId: sessionId || undefined, redirectUrl: "/signin" });
-      router.replace("/signin");
-    } catch (err) {
-      setSigningOut(false);
-      throw err;
-    }
-  };
 
   const openSessionOverview = useCallback(async (session: RoadmapSession) => {
     if (session.status === "locked") return;
@@ -505,23 +491,15 @@ export default function HomeScreen() {
   ]);
 
   return (
-    <SafeAreaView style={casesStyles.container}>
-      {/* Header matching Today and Portfolio */}
-      <View style={portfolioStyles.screenHeaderRow}>
-        <View style={portfolioStyles.screenHeaderText}>
-          <Text style={portfolioStyles.screenTitle}>Roadmap</Text>
-          <Text style={portfolioStyles.screenSubtitle}>Follow your clinical journey.</Text>
+    <SafeAreaView style={portfolioStyles.container}>
+      <ScrollView contentContainerStyle={portfolioStyles.scrollContent}>
+        <View style={portfolioStyles.screenHeaderRow}>
+          <View style={portfolioStyles.screenHeaderText}>
+            <Text style={portfolioStyles.screenTitle}>Roadmap</Text>
+            <Text style={portfolioStyles.screenSubtitle}>Follow your clinical journey.</Text>
+          </View>
         </View>
-        <Pressable
-          onPress={handleSignOut}
-          disabled={signingOut}
-          style={[portfolioStyles.signOutButton, { opacity: signingOut ? 0.6 : 1 }]}
-        >
-          <Text style={portfolioStyles.signOutButtonText}>{signingOut ? "Signing out..." : "Sign Out"}</Text>
-        </Pressable>
-      </View>
 
-      <ScrollView contentContainerStyle={casesStyles.scrollContent}>
         {!!journeySummary && (
           <CompactJourneyCard
             levelTitle={journeySummary.levelTitle}
@@ -530,8 +508,6 @@ export default function HomeScreen() {
             streakCount={journeySummary.streak?.currentCount}
           />
         )}
-
-        {/* Duplicate page header removed – title now provided by the top header */}
 
         {loadingRoadmap ? (
           <View style={casesStyles.loadingBlock}>

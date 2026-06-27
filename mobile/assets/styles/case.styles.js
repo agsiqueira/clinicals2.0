@@ -672,6 +672,7 @@ export const caseStyles = StyleSheet.create({
   },
 
   debriefPreceptorOverlay: {
+    flex: 1,
     width: "100%",
     maxWidth: 560,
     alignSelf: "center",
@@ -690,20 +691,20 @@ export const caseStyles = StyleSheet.create({
   },
 
   debriefPreceptorHeroLayerCompact: {
-    top: 8,
+    top: 4,
   },
 
   debriefCard: {
-    marginTop: 132,
-    maxHeight: "68%",
+    marginTop: 92,
+    height: "84%",
     borderRadius: 8,
     backgroundColor: "#ffffff",
     overflow: "hidden",
   },
 
   debriefCardCompact: {
-    marginTop: 116,
-    maxHeight: "70%",
+    marginTop: 76,
+    height: "86%",
   },
 
   achievementUnlockCard: {
@@ -745,7 +746,7 @@ export const caseStyles = StyleSheet.create({
 
   debriefFixedHeader: {
     paddingHorizontal: 16,
-    paddingTop: 92,
+    paddingTop: 66,
     paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#f3f4f6",
@@ -770,6 +771,12 @@ export const caseStyles = StyleSheet.create({
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
     gap: 10,
+  },
+
+  debriefScrollableBody: {
+    flexGrow: 1,
+    flexShrink: 1,
+    minHeight: 0,
   },
 
   debriefHeaderText: {
@@ -801,6 +808,15 @@ export const caseStyles = StyleSheet.create({
   },
 
   debriefChatBox: {
+    borderWidth: 1,
+    borderColor: "#ddd6fe",
+    borderRadius: 8,
+    padding: 12,
+    gap: 10,
+    backgroundColor: "#ffffff",
+  },
+
+  debriefCoachingCard: {
     borderWidth: 1,
     borderColor: "#ddd6fe",
     borderRadius: 8,
@@ -853,6 +869,21 @@ export const caseStyles = StyleSheet.create({
   debriefQuickActionText: {
     color: "#5b21b6",
     fontSize: 12,
+    fontWeight: "800",
+  },
+
+  debriefCustomQuestionButton: {
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+
+  debriefCustomQuestionText: {
+    color: "#374151",
     fontWeight: "800",
   },
 
@@ -949,6 +980,117 @@ export const caseStyles = StyleSheet.create({
     gap: 12,
   },
 
+  reviewSummaryCard: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    padding: 12,
+    gap: 10,
+  },
+
+  reviewSummaryCardCompact: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    padding: 10,
+    gap: 8,
+  },
+
+  reviewSummaryTitle: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "800",
+  },
+
+  reviewSummaryRow: {
+    gap: 5,
+  },
+
+  reviewSummaryLabel: {
+    color: "#6b7280",
+    fontSize: 12,
+    fontWeight: "700",
+  },
+
+  reviewSummaryValue: {
+    color: "#1f2937",
+    lineHeight: 20,
+  },
+
+  reviewSummaryBulletList: {
+    gap: 4,
+  },
+
+  reviewSummaryBullet: {
+    color: "#1f2937",
+    lineHeight: 20,
+  },
+
+  reviewSummaryDivider: {
+    height: 1,
+    backgroundColor: "#e5e7eb",
+  },
+
+  debriefMetricBoxCompact: {
+    flex: 1,
+    minWidth: 150,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    padding: 10,
+    backgroundColor: "#ffffff",
+    justifyContent: "center",
+    gap: 6,
+  },
+
+  learningDetailsCard: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    padding: 10,
+    gap: 8,
+  },
+
+  learningDetailsToggle: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+
+  learningDetailsTitle: {
+    flex: 1,
+    color: "#111827",
+    fontWeight: "700",
+  },
+
+  learningDetailsChevron: {
+    color: "#6d28d9",
+    fontSize: 12,
+    fontWeight: "800",
+  },
+
+  learningDetailsText: {
+    color: "#374151",
+    lineHeight: 20,
+  },
+
+  learningDetailsRubricList: {
+    gap: 10,
+  },
+
+  learningDetailsRubricItem: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    padding: 10,
+  },
+
   debriefMetricBox: {
     flex: 1,
     minWidth: 180,
@@ -1032,6 +1174,7 @@ export const caseStyles = StyleSheet.create({
   debriefActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    flexWrap: "wrap",
     gap: 10,
   },
 

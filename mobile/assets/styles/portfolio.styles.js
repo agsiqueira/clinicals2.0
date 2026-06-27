@@ -869,4 +869,95 @@ export const portfolioStyles = StyleSheet.create({
     color: "#6b7280",
     lineHeight: 20,
   },
+  portfolioTabRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  portfolioTabButton: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "#ffffff",
+  },
+  portfolioTabButtonActive: {
+    borderColor: "#8b5cf6",
+    backgroundColor: "#f5f3ff",
+  },
+  portfolioTabText: {
+    color: "#374151",
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  portfolioTabTextActive: {
+    color: "#5b21b6",
+  },
+  growthSummaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  growthSummaryItem: {
+    flexGrow: 1,
+    flexBasis: "46%",
+    gap: 4,
+  },
+  metricValueCompact: {
+    color: "#111827",
+    fontSize: 22,
+    fontWeight: "900",
+  },
+  competencyProfileCard: {
+    borderTopWidth: 1,
+    borderColor: "#f3f4f6",
+    paddingTop: 12,
+    gap: 8,
+  },
+  competencyProfileHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  competencyProfileScoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  competencyProfileScoreMain: {
+    flex: 1,
+  },
+  competencyProfilePercent: {
+    width: 44,
+    color: "#111827",
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "right",
+  },
+  trendPill: {
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 12,
+    fontWeight: "800",
+    overflow: "hidden",
+  },
+  trendPillImproving: {
+    backgroundColor: "#dcfce7",
+    color: "#166534",
+  },
+  trendPillStable: {
+    backgroundColor: "#ede9fe",
+    color: "#5b21b6",
+  },
+  trendPillNeedsPractice: {
+    backgroundColor: "#fee2e2",
+    color: "#991b1b",
+  },
+  trendPillInsufficient: {
+    backgroundColor: "#f3f4f6",
+    color: "#6b7280",
+  },
 });

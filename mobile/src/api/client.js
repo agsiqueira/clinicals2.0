@@ -137,6 +137,7 @@ export const api = {
   getCaseById: (id) => request(`/cases/${id}`),
   getProgress: (headers) => request("/progress", { headers }),
   getClinicalPortfolio: (headers) => request("/clinical-portfolio", { headers }),
+  getCompetencyProfile: (headers) => request("/profile/competencies", { headers }),
   getToday: (headers) => request("/today", { headers }),
   getFacultyDashboard: (headers) => request("/faculty/dashboard", { headers }),
   getFacultyStudentDetail: (studentId, headers) =>

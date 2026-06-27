@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import { api } from "../../src/api/client";
 import { casesStyles } from "../../assets/styles/cases.styles";
+import { portfolioStyles } from "../../assets/styles/portfolio.styles";
 import { CompactJourneyCard } from "../../src/components/CompactJourneyCard";
 import { ClinicalsChatComposer } from "../../src/components/ClinicalsChatComposer";
 import { EncounterNodeCard } from "../../src/components/EncounterNodeCard";
@@ -505,21 +506,18 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={casesStyles.container}>
-      <View style={casesStyles.headerBar}>
-        <View style={casesStyles.headerLeft}>
-          <Text style={casesStyles.headerName}>
-            {displayName ? `Hi, ${displayName}` : "Welcome"}
-          </Text>
-          <Text numberOfLines={1} style={casesStyles.headerEmail}>
-            {user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress || ""}
-          </Text>
+      {/* Header matching Today and Portfolio */}
+      <View style={portfolioStyles.screenHeaderRow}>
+        <View style={portfolioStyles.screenHeaderText}>
+          <Text style={portfolioStyles.screenTitle}>Roadmap</Text>
+          <Text style={portfolioStyles.screenSubtitle}>Follow your clinical journey.</Text>
         </View>
         <Pressable
           onPress={handleSignOut}
           disabled={signingOut}
-          style={[casesStyles.signOutButton, { opacity: signingOut ? 0.6 : 1 }]}
+          style={[portfolioStyles.signOutButton, { opacity: signingOut ? 0.6 : 1 }]}
         >
-          <Text style={casesStyles.signOutButtonText}>{signingOut ? "Signing out..." : "Sign Out"}</Text>
+          <Text style={portfolioStyles.signOutButtonText}>{signingOut ? "Signing out..." : "Sign Out"}</Text>
         </Pressable>
       </View>
 
@@ -533,10 +531,7 @@ export default function HomeScreen() {
           />
         )}
 
-        <View style={casesStyles.sectionHeader}>
-          <Text style={casesStyles.casesTitle}>Roadmap</Text>
-          <Text style={casesStyles.casesSubText}>Follow your clinical journey.</Text>
-        </View>
+        {/* Duplicate page header removed – title now provided by the top header */}
 
         {loadingRoadmap ? (
           <View style={casesStyles.loadingBlock}>

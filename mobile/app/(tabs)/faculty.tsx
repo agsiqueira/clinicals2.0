@@ -493,7 +493,7 @@ export default function FacultyDashboardScreen() {
 
         <View style={facultyStyles.sectionCard}>
           <SectionHeader
-            title="Student Growth"
+            title="Student Learning Growth"
             subtitle="First-to-latest scored attempt movement per student."
             summary={sectionCountLabel(studentGrowth.length, "student")}
           />

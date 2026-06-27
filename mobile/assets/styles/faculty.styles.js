@@ -28,7 +28,7 @@ export const facultyStyles = StyleSheet.create({
   },
   headerText: {
     flex: 1,
-    gap: 4,
+    gap: 8, // increased spacing between title and subtitle
   },
   headerActions: {
     alignItems: "flex-end",

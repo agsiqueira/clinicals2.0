@@ -11,6 +11,7 @@ const progressRouter = require("./routes/progress");
 const learningPathsRouter = require("./routes/learningPaths");
 const clinicalPortfolioRouter = require("./routes/clinicalPortfolio");
 const todayRouter = require("./routes/today");
+const facultyRouter = require("./routes/faculty");
 const { syncAllCases } = require("./utils/caseSync");
 
 dotenv.config();
@@ -32,6 +33,7 @@ app.use("/api/progress", progressRouter);
 app.use("/api/learning-paths", learningPathsRouter);
 app.use("/api/clinical-portfolio", clinicalPortfolioRouter);
 app.use("/api/today", todayRouter);
+app.use("/api/faculty", facultyRouter);
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });

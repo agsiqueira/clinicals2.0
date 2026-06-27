@@ -40,6 +40,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="faculty"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="faculty/student/[studentId]"
+        options={{ href: null }}
+      />
+      <Tabs.Screen
         name="level1"
         options={{ href: null }}
       />

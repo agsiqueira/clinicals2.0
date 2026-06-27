@@ -245,6 +245,12 @@ const FORMAL_INTRODUCTION_CRITERIA = [
   "professional_communication_humanism",
 ];
 const CHIEF_COMPLAINT_CRITERIA = ["reporter_chief_complaint"];
+const HPI_SUMMARY_CRITERIA = ["reporter_hpi_summary_oldcarts"];
+const ACHIEVEMENT_CRITERIA_BY_SLUG: Record<string, string[]> = {
+  "formal-introduction": FORMAL_INTRODUCTION_CRITERIA,
+  "chief-complaint": CHIEF_COMPLAINT_CRITERIA,
+  "hpi-summary": HPI_SUMMARY_CRITERIA,
+};
 
 function statusColor(status: string) {
   if (status === "met") return "#166534";
@@ -348,6 +354,64 @@ function badgeTierFromScore(score: number) {
 function badgeLabelFromTier(tier?: string | null) {
   if (!tier || tier === "NONE") return "No badge";
   return tier.charAt(0) + tier.slice(1).toLowerCase();
+}
+
+function badgeVisualConfig(tier?: string | null) {
+  if (tier === "GOLD") {
+    return {
+      label: "Gold",
+      mark: "🥇",
+      copy: "Strong, consistent performance.",
+      style: caseStyles.badgeVisualGold,
+    };
+  }
+  if (tier === "SILVER") {
+    return {
+      label: "Silver",
+      mark: "🥈",
+      copy: "Several core goals met.",
+      style: caseStyles.badgeVisualSilver,
+    };
+  }
+  if (tier === "BRONZE") {
+    return {
+      label: "Bronze",
+      mark: "🥉",
+      copy: "Skill building started.",
+      style: caseStyles.badgeVisualBronze,
+    };
+  }
+  return {
+    label: "No badge",
+    mark: "○",
+    copy: "Retry with one focused goal.",
+    style: caseStyles.badgeVisualNone,
+  };
+}
+
+function cleanFeedback(value?: string | null) {
+  return String(value || "")
+    .replace(/^Review:\s*/i, "")
+    .trim();
+}
+
+function uniqueStrings(values: string[]) {
+  const seen = new Set<string>();
+  return values.filter((value) => {
+    const key = value.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function getSessionCriterionIds(achievements: Clinicals2AchievementResult[]) {
+  const ids = new Set<string>();
+  achievements.forEach((achievement) => {
+    const slug = achievement.slug || achievement.achievementId;
+    (ACHIEVEMENT_CRITERIA_BY_SLUG[slug] || []).forEach((criterionId) => ids.add(criterionId));
+  });
+  return ids;
 }
 
 function buildFallbackDebrief(result: SubmissionResult): Clinicals2Debrief {
@@ -1477,11 +1541,35 @@ export default function Level1Screen() {
         CHIEF_COMPLAINT_CRITERIA,
         submissionResult.criteria_results
       ),
+      ...(submissionResult.criteria_results.some((criterion) => HPI_SUMMARY_CRITERIA.includes(criterion.id))
+        ? [
+            summarizeCriteriaAchievement(
+              "HPI Summary",
+              HPI_SUMMARY_CRITERIA,
+              submissionResult.criteria_results
+            ),
+          ]
+        : []),
     ];
   }, [submissionResult, visibleDebrief]);
 
   const reviewSessionScore = visibleDebrief?.sessionScore ?? submissionResult?.score ?? 0;
-  const reviewBadgeLabel = visibleDebrief?.badgeLabel || badgeLabelFromTier(badgeTierFromScore(reviewSessionScore));
+  const reviewBadgeTier = visibleDebrief?.badgeTier || badgeTierFromScore(reviewSessionScore);
+  const reviewBadgeLabel = visibleDebrief?.badgeLabel || badgeLabelFromTier(reviewBadgeTier);
+  const reviewBadgeVisual = badgeVisualConfig(reviewBadgeTier);
+  const passedObjectives = reviewAchievementResults.filter((achievement) => achievement.achieved);
+  const objectivesToImprove = reviewAchievementResults.filter((achievement) => !achievement.achieved);
+  const coachingPoints = uniqueStrings([
+    ...objectivesToImprove
+      .map((achievement) => cleanFeedback(achievement.feedback) || `Practice ${achievement.title}.`)
+      .filter(Boolean),
+    cleanFeedback(visibleDebrief?.coaching),
+    cleanFeedback(submissionResult?.feedback),
+  ]).slice(0, 3);
+  const sessionCriterionIds = getSessionCriterionIds(reviewAchievementResults);
+  const detailedRubricItems = (submissionResult?.criteria_results || []).filter((criterion) =>
+    sessionCriterionIds.has(criterion.id)
+  );
   const reviewSubmittedAt = formatResultDate(submissionResult?.submittedAt);
   const achievementUnlocks = newlyEarnedAchievements(submissionResult);
   const firstAchievementUnlock = achievementUnlocks[0] || null;
@@ -1705,174 +1793,198 @@ export default function Level1Screen() {
         onRequestClose={() => setDebriefVisible(false)}
       >
         <View style={caseStyles.debriefOverlay}>
-          <View style={caseStyles.debriefCard}>
+          <View style={caseStyles.debriefPreceptorOverlay}>
             {visibleDebrief ? (
-              <ScrollView contentContainerStyle={caseStyles.debriefScrollContent}>
-                <View style={caseStyles.debriefHeaderRow}>
-                  <View style={caseStyles.debriefAvatarCircle}>
-                    <MentorAvatar
-                      mentorName="Dr. Martinez"
-                      mentorSlug="dr-martinez"
-                      isSpeaking={debriefMentorSpeech.isSpeaking}
-                      showDecorations={false}
-                      size={48}
-                    />
-                  </View>
-                  <View style={caseStyles.debriefHeaderText}>
-                    <Text style={caseStyles.debriefEyebrow}>Dr. Martinez Debrief</Text>
-                    <Text style={caseStyles.debriefTitle}>Post-session coaching</Text>
-                  </View>
-                </View>
-
-                <View style={caseStyles.debriefChatBox}>
-                  <View style={caseStyles.debriefVoiceHeader}>
-                    <Text style={caseStyles.debriefSectionTitle}>Ask Dr. Martinez</Text>
-                    <View style={caseStyles.debriefVoiceControls}>
-                      <Pressable
-                        onPress={() => {
-                          if (voiceEnabled) {
-                            void debriefMentorSpeech.stop();
-                          }
-                          setVoiceEnabled((current) => !current);
-                        }}
-                        style={({ pressed }) => [
-                          caseStyles.debriefVoiceToggle,
-                          { opacity: pressed ? 0.75 : 1 },
-                        ]}
-                      >
-                        <Text style={caseStyles.debriefVoiceToggleText}>
-                          {voiceEnabled ? "Voice: On" : "Voice: Off"}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                  <View style={caseStyles.debriefChatMessages}>
-                    <View
-                      style={[
-                        caseStyles.debriefChatBubble,
-                        caseStyles.debriefChatBubbleAssistant,
-                      ]}
-                    >
-                      <Text style={caseStyles.debriefMentorLabel}>Dr. Martinez</Text>
-                      <Text style={caseStyles.debriefText}>
-                        {visibleDebrief.greeting || visibleDebrief.recognition}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={caseStyles.debriefQuickActions}>
-                    {DEBRIEF_QUICK_ACTIONS.map((action) => (
-                      <Pressable
-                        key={action}
-                        onPress={() => sendDebriefMessage(action)}
-                        disabled={debriefSending || !conversationId}
-                        style={({ pressed }) => [
-                          caseStyles.debriefQuickActionButton,
-                          {
-                            opacity:
-                              debriefSending || !conversationId ? 0.45 : pressed ? 0.75 : 1,
-                          },
-                        ]}
-                      >
-                        <Text style={caseStyles.debriefQuickActionText}>{action}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-
-                  {debriefMessages.length > 0 ? (
-                    <View style={caseStyles.debriefChatMessages}>
-                      {debriefMessages.map((message, index) => (
-                        <View
-                          key={`${message.role}-${index}`}
-                          style={[
-                            caseStyles.debriefChatBubble,
-                            message.role === "user"
-                              ? caseStyles.debriefChatBubbleUser
-                              : caseStyles.debriefChatBubbleAssistant,
-                          ]}
-                        >
-                          <Text style={caseStyles.debriefMentorLabel}>
-                            {message.role === "user" ? "You" : "Dr. Martinez"}
-                          </Text>
-                          <Text style={caseStyles.debriefText}>{message.content}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-
-                  {debriefSending ? (
-                    <Text style={caseStyles.debriefChatHint}>Dr. Martinez is responding...</Text>
-                  ) : null}
-                  {debriefError ? <Text style={caseStyles.errorText}>{debriefError}</Text> : null}
-
-                  <ClinicalsChatComposer
-                    value={debriefInput}
-                    onChangeText={setDebriefInput}
-                    editable={!debriefSending}
-                    placeholder="Ask Dr. Martinez about your report..."
-                    submitLabel="Ask"
-                    onSubmit={() => sendDebriefMessage()}
-                    sendDisabled={debriefSending || !debriefInput.trim() || !conversationId}
-                    sending={debriefSending}
-                    onMicPress={debriefTranscription.toggleRecording}
-                    micDisabled={
-                      debriefSending ||
-                      debriefTranscription.transcribing ||
-                      debriefTranscription.recordingBusy
-                    }
-                    transcribing={debriefTranscription.transcribing}
-                    isRecording={debriefTranscription.isRecording}
+              <>
+                <View
+                  pointerEvents="none"
+                  style={[
+                    caseStyles.debriefPreceptorHeroLayer,
+                    isNarrowScreen && caseStyles.debriefPreceptorHeroLayerCompact,
+                  ]}
+                >
+                  <MentorAvatar
+                    mentorName="Dr. Martinez"
+                    mentorSlug="dr-martinez"
+                    isSpeaking={debriefMentorSpeech.isSpeaking}
+                    size={isNarrowScreen ? 196 : 226}
+                    variant="breakout-circle"
                   />
                 </View>
 
-                <View style={caseStyles.debriefReportDivider}>
-                  <View style={caseStyles.debriefReportLine} />
-                  <Text style={caseStyles.debriefReportHeading}>Session Report</Text>
-                  <View style={caseStyles.debriefReportLine} />
-                </View>
-
-                <View style={caseStyles.debriefReportPanel}>
-                  <View style={caseStyles.debriefScoreRow}>
-                    <View style={caseStyles.debriefMetricBox}>
-                      <Text style={caseStyles.debriefMetricLabel}>Session Score</Text>
-                      <Text style={caseStyles.debriefMetricValue}>{visibleDebrief.sessionScore}%</Text>
-                    </View>
-                    <View style={caseStyles.debriefMetricBox}>
-                      <Text style={caseStyles.debriefMetricLabel}>Badge Earned</Text>
-                      <Text style={caseStyles.debriefMetricValue}>{visibleDebrief.badgeLabel}</Text>
+                <View
+                  style={[
+                    caseStyles.debriefCard,
+                    isNarrowScreen && caseStyles.debriefCardCompact,
+                  ]}
+                >
+                  <View style={caseStyles.debriefFixedHeader}>
+                    <View style={caseStyles.debriefIdentityRow}>
+                      <View style={caseStyles.debriefHeaderText}>
+                        <Text style={caseStyles.debriefName}>Dr. Martinez</Text>
+                        <Text style={caseStyles.debriefSpecialty}>Post-session coaching</Text>
+                      </View>
+                      <View style={caseStyles.debriefVoiceControls}>
+                        <Pressable
+                          onPress={() => {
+                            if (voiceEnabled) {
+                              void debriefMentorSpeech.stop();
+                            }
+                            setVoiceEnabled((current) => !current);
+                          }}
+                          style={({ pressed }) => [
+                            caseStyles.debriefVoiceToggle,
+                            { opacity: pressed ? 0.75 : 1 },
+                          ]}
+                        >
+                          <Text style={caseStyles.debriefVoiceToggleText}>
+                            {voiceEnabled ? "Voice: On" : "Voice: Off"}
+                          </Text>
+                        </Pressable>
+                      </View>
                     </View>
                   </View>
 
-                  {visibleDebrief.achievementResults.length > 0 ? (
-                    <View style={caseStyles.debriefSection}>
-                      <Text style={caseStyles.debriefSectionTitle}>Achievement Results</Text>
-                      {visibleDebrief.achievementResults.map((achievement) => (
-                        <View key={achievement.achievementId} style={caseStyles.debriefAchievementRow}>
-                          <View style={caseStyles.debriefAchievementMain}>
-                            <Text style={caseStyles.debriefAchievementTitle}>{achievement.title}</Text>
-                            {!!achievement.feedback && (
-                              <Text style={caseStyles.debriefAchievementFeedback}>
-                                {achievement.feedback}
-                              </Text>
-                            )}
-                          </View>
-                          <Text style={caseStyles.debriefAchievementScore}>
-                            {Math.round(Number(achievement.percentScore || 0))}%
+                  <ScrollView contentContainerStyle={caseStyles.debriefScrollContent}>
+                    <View style={caseStyles.debriefChatBox}>
+                      <Text style={caseStyles.debriefContextLabel}>Ask about your report</Text>
+                      <View style={caseStyles.debriefChatMessages}>
+                        <View
+                          style={[
+                            caseStyles.debriefChatBubble,
+                            caseStyles.debriefChatBubbleAssistant,
+                          ]}
+                        >
+                          <Text style={caseStyles.debriefMentorLabel}>Dr. Martinez</Text>
+                          <Text style={caseStyles.debriefText}>
+                            {visibleDebrief.greeting || visibleDebrief.recognition}
                           </Text>
                         </View>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
+                      </View>
+                      <View style={caseStyles.debriefQuickActions}>
+                        {DEBRIEF_QUICK_ACTIONS.map((action) => (
+                          <Pressable
+                            key={action}
+                            onPress={() => sendDebriefMessage(action)}
+                            disabled={debriefSending || !conversationId}
+                            style={({ pressed }) => [
+                              caseStyles.debriefQuickActionButton,
+                              {
+                                opacity:
+                                  debriefSending || !conversationId ? 0.45 : pressed ? 0.75 : 1,
+                              },
+                            ]}
+                          >
+                            <Text style={caseStyles.debriefQuickActionText}>{action}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
 
-                <View style={caseStyles.debriefActions}>
-                  <Pressable onPress={() => setDebriefVisible(false)} style={caseStyles.debriefSecondaryButton}>
-                    <Text style={caseStyles.debriefSecondaryButtonText}>Review Results</Text>
-                  </Pressable>
-                  <Pressable onPress={continueLearning} style={caseStyles.debriefPrimaryButton}>
-                    <Text style={caseStyles.debriefPrimaryButtonText}>Continue Learning</Text>
-                  </Pressable>
+                      {debriefMessages.length > 0 ? (
+                        <View style={caseStyles.debriefChatMessages}>
+                          {debriefMessages.map((message, index) => (
+                            <View
+                              key={`${message.role}-${index}`}
+                              style={[
+                                caseStyles.debriefChatBubble,
+                                message.role === "user"
+                                  ? caseStyles.debriefChatBubbleUser
+                                  : caseStyles.debriefChatBubbleAssistant,
+                              ]}
+                            >
+                              <Text style={caseStyles.debriefMentorLabel}>
+                                {message.role === "user" ? "You" : "Dr. Martinez"}
+                              </Text>
+                              <Text style={caseStyles.debriefText}>{message.content}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
+
+                      {debriefSending ? (
+                        <Text style={caseStyles.debriefChatHint}>Dr. Martinez is responding...</Text>
+                      ) : null}
+                      {debriefError ? <Text style={caseStyles.errorText}>{debriefError}</Text> : null}
+
+                      <ClinicalsChatComposer
+                        value={debriefInput}
+                        onChangeText={setDebriefInput}
+                        editable={!debriefSending}
+                        placeholder="Ask Dr. Martinez about your report..."
+                        submitLabel="Ask"
+                        onSubmit={() => sendDebriefMessage()}
+                        sendDisabled={debriefSending || !debriefInput.trim() || !conversationId}
+                        sending={debriefSending}
+                        onMicPress={debriefTranscription.toggleRecording}
+                        micDisabled={
+                          debriefSending ||
+                          debriefTranscription.transcribing ||
+                          debriefTranscription.recordingBusy
+                        }
+                        transcribing={debriefTranscription.transcribing}
+                        isRecording={debriefTranscription.isRecording}
+                      />
+                    </View>
+
+                    <View style={caseStyles.debriefReportDivider}>
+                      <View style={caseStyles.debriefReportLine} />
+                      <Text style={caseStyles.debriefReportHeading}>Session Report</Text>
+                      <View style={caseStyles.debriefReportLine} />
+                    </View>
+
+                    <View style={caseStyles.debriefReportPanel}>
+                      <View style={caseStyles.debriefScoreRow}>
+                        <View style={caseStyles.debriefMetricBox}>
+                          <Text style={caseStyles.debriefMetricLabel}>Session Score</Text>
+                          <Text style={caseStyles.debriefMetricValue}>{visibleDebrief.sessionScore}%</Text>
+                        </View>
+                        <View style={caseStyles.debriefMetricBox}>
+                          <Text style={caseStyles.debriefMetricLabel}>Badge Earned</Text>
+                          <View style={[caseStyles.badgeVisualCard, reviewBadgeVisual.style]}>
+                            <View style={caseStyles.badgeVisualMark}>
+                              <Text style={caseStyles.badgeVisualMarkText}>{reviewBadgeVisual.mark}</Text>
+                            </View>
+                            <View style={caseStyles.badgeVisualText}>
+                              <Text style={caseStyles.badgeVisualLabel}>{reviewBadgeVisual.label}</Text>
+                              <Text style={caseStyles.badgeVisualCopy}>{reviewBadgeVisual.copy}</Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+
+                      {reviewAchievementResults.length > 0 ? (
+                        <View style={caseStyles.debriefSection}>
+                          <Text style={caseStyles.debriefSectionTitle}>Review Summary</Text>
+                          <Text style={caseStyles.debriefText}>
+                            Passed objectives: {passedObjectives.length > 0 ? passedObjectives.map((item) => item.title).join(", ") : "None yet"}
+                          </Text>
+                          <Text style={caseStyles.debriefText}>
+                            Objectives to improve: {objectivesToImprove.length > 0 ? objectivesToImprove.map((item) => item.title).join(", ") : "No major gaps flagged"}
+                          </Text>
+                          {coachingPoints.length > 0 ? (
+                            <View style={caseStyles.debriefCoachingList}>
+                              {coachingPoints.map((point) => (
+                                <Text key={point} style={caseStyles.debriefCoachingPoint}>- {point}</Text>
+                              ))}
+                            </View>
+                          ) : null}
+                        </View>
+                      ) : null}
+                    </View>
+                  </ScrollView>
+
+                  <View style={caseStyles.debriefFixedFooter}>
+                    <View style={caseStyles.debriefActions}>
+                      <Pressable onPress={() => setDebriefVisible(false)} style={caseStyles.debriefSecondaryButton}>
+                        <Text style={caseStyles.debriefSecondaryButtonText}>Review Results</Text>
+                      </Pressable>
+                      <Pressable onPress={continueLearning} style={caseStyles.debriefPrimaryButton}>
+                        <Text style={caseStyles.debriefPrimaryButtonText}>Continue Learning</Text>
+                      </Pressable>
+                    </View>
+                  </View>
                 </View>
-              </ScrollView>
+              </>
             ) : null}
           </View>
         </View>
@@ -1937,7 +2049,7 @@ export default function Level1Screen() {
 
         {stage === "results" && submissionResult ? (
           <FlatList
-            data={showDetailedRubric ? submissionResult.criteria_results : []}
+            data={showDetailedRubric ? detailedRubricItems : []}
             keyExtractor={(item) => item.id}
             contentContainerStyle={caseStyles.resultsFlatListContent}
             ListHeaderComponent={
@@ -1957,7 +2069,9 @@ export default function Level1Screen() {
                     </View>
                     <View style={caseStyles.resultsSummaryItem}>
                       <Text style={caseStyles.resultsSummaryLabel}>Badge</Text>
-                      <Text style={caseStyles.resultsSummaryValue}>{reviewBadgeLabel}</Text>
+                      <View style={[caseStyles.resultsBadgeInline, reviewBadgeVisual.style]}>
+                        <Text style={caseStyles.resultsBadgeInlineText}>{reviewBadgeLabel}</Text>
+                      </View>
                     </View>
                     {reviewSubmittedAt ? (
                       <View style={caseStyles.resultsSummaryItem}>
@@ -1969,22 +2083,35 @@ export default function Level1Screen() {
                 </View>
 
                 <View style={caseStyles.resultsCard}>
-                  <Text style={caseStyles.resultsSectionHeading}>Achievement Results</Text>
-                  {reviewAchievementResults.map((achievement) => (
-                    <View key={achievement.achievementId} style={caseStyles.resultsAchievementRow}>
-                      <View style={caseStyles.resultsAchievementMain}>
-                        <Text style={caseStyles.resultsAchievementTitle}>{achievement.title}</Text>
-                        {!!achievement.feedback && (
-                          <Text style={caseStyles.resultsAchievementFeedback}>
-                            {achievement.feedback}
-                          </Text>
-                        )}
-                      </View>
-                      <Text style={caseStyles.resultsAchievementScore}>
-                        {Math.round(Number(achievement.percentScore || 0))}%
+                  <Text style={caseStyles.resultsSectionHeading}>Review Results</Text>
+                  <View style={caseStyles.resultsReviewBlock}>
+                    <Text style={caseStyles.resultsSectionTitle}>Passed objectives</Text>
+                    <Text style={caseStyles.resultsReportText}>
+                      {passedObjectives.length > 0
+                        ? passedObjectives.map((achievement) => achievement.title).join(", ")
+                        : "No objectives met the pass threshold yet."}
+                    </Text>
+                  </View>
+                  <View style={caseStyles.resultsReviewBlock}>
+                    <Text style={caseStyles.resultsSectionTitle}>Objectives to improve</Text>
+                    <Text style={caseStyles.resultsReportText}>
+                      {objectivesToImprove.length > 0
+                        ? objectivesToImprove.map((achievement) => achievement.title).join(", ")
+                        : "No major improvement objectives were flagged."}
+                    </Text>
+                  </View>
+                  <View style={caseStyles.resultsReviewBlock}>
+                    <Text style={caseStyles.resultsSectionTitle}>Coaching points</Text>
+                    {coachingPoints.length > 0 ? (
+                      coachingPoints.map((point) => (
+                        <Text key={point} style={caseStyles.resultsMissedItem}>- {point}</Text>
+                      ))
+                    ) : (
+                      <Text style={caseStyles.resultsReportText}>
+                        Choose one objective and ask Dr. Martinez how to improve it.
                       </Text>
-                    </View>
-                  ))}
+                    )}
+                  </View>
                 </View>
 
                 <View style={caseStyles.resultsCard}>
@@ -1999,7 +2126,7 @@ export default function Level1Screen() {
                     <View style={caseStyles.resultsDetailHeaderText}>
                       <Text style={caseStyles.resultsSectionHeading}>Detailed Rubric / Technical Details</Text>
                       <Text style={caseStyles.resultsMutedText}>
-                        Criteria, section scores, missed items, red flags, and point totals.
+                        Detailed rubric is limited to this session's objectives.
                       </Text>
                     </View>
                     <Pressable
@@ -2072,7 +2199,13 @@ export default function Level1Screen() {
                         </View>
                       ) : null}
 
-                      <Text style={caseStyles.resultsSectionTitle}>Criterion Breakdown</Text>
+                      {detailedRubricItems.length > 0 ? (
+                        <Text style={caseStyles.resultsSectionTitle}>Criterion Breakdown</Text>
+                      ) : (
+                        <Text style={caseStyles.resultsMutedText}>
+                          Detailed rubric is limited to this session's objectives.
+                        </Text>
+                      )}
                     </View>
                   ) : null}
                 </View>

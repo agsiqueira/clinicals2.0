@@ -1,0 +1,49 @@
+---
+description: Clinicals 2.0 project rules
+alwaysApply: true
+---
+
+# Clinicals 2.0 Rules
+
+You are working on Clinicals 2.0.
+
+## Project stack
+
+- Backend: Node.js / Express
+- Database: PostgreSQL
+- Mobile: Expo / React Native
+- Web support may exist through Expo web
+- Current branch: feature/dashboard-v1
+
+## Coding behavior
+
+- Inspect existing implementation before changing code.
+- Make small, focused patches.
+- Preserve existing architecture, naming, and file structure.
+- Do not rewrite unrelated screens, services, routes, or components.
+- Do not introduce new dependencies unless explicitly approved.
+- Prefer existing API client helpers, service functions, styles, and components.
+- Keep backend and mobile changes aligned when API contracts change.
+- Avoid changing database schema unless the task explicitly requires it.
+
+## Workflow
+
+For every task:
+
+1. Identify relevant files.
+2. Explain the intended change.
+3. Wait for approval before editing unless the user explicitly says "do it" or "proceed."
+4. After editing, provide:
+   - Files changed
+   - What changed
+   - How to test
+   - Any risks or assumptions
+
+## Testing
+
+When relevant, suggest commands such as:
+
+```bash
+cd backend
+npm test
+npm run dev

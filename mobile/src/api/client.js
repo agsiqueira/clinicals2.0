@@ -11,6 +11,10 @@ if (!BASE_URL) {
 
 const API_PREFIX = "/api";
 
+function apiUrl(path) {
+  return `${BASE_URL}${API_PREFIX}${path}`;
+}
+
 function withTimeout(promise, ms, fallback) {
   return Promise.race([
     promise,
@@ -41,7 +45,7 @@ async function request(path, { method = "GET", body, headers } = {}) {
 
   let res;
   try {
-    res = await fetch(`${BASE_URL}${API_PREFIX}${path}`, {
+    res = await fetch(apiUrl(path), {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -134,6 +138,11 @@ export const api = {
   getProgress: (headers) => request("/progress", { headers }),
   getClinicalPortfolio: (headers) => request("/clinical-portfolio", { headers }),
   getToday: (headers) => request("/today", { headers }),
+  getFacultyDashboard: (headers) => request("/faculty/dashboard", { headers }),
+  getFacultyStudentDetail: (studentId, headers) =>
+    request(`/faculty/students/${studentId}`, { headers }),
+  getFacultyDashboardCsvUrl: () => apiUrl("/faculty/dashboard/export.csv"),
+  getFacultyStudentCsvUrl: (studentId) => apiUrl(`/faculty/students/${studentId}/export.csv`),
 
   // Example: create a case
   createCase: (payload) =>

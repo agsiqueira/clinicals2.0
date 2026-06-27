@@ -4,6 +4,7 @@ const {
   computeSessionScore,
   determineBadgeTier,
 } = require("../utils/achievementScoring");
+const { evaluateCompetencyEvidence } = require("./competencyEngine");
 const {
   evaluateMotivationalAchievementsForSessionAttempt,
 } = require("./motivationalAchievements");
@@ -280,6 +281,15 @@ async function finalizeSessionAttemptFromSubmission({ sessionAttemptId, submissi
     sessionAttempt.patientSession.achievements,
     criteriaResults
   );
+  const scoredAt = new Date();
+  evaluateCompetencyEvidence({
+    studentId: sessionAttempt.userId,
+    session: sessionAttempt.patientSession,
+    attemptId: sessionAttemptId,
+    evaluatedObjectives: achievementResults,
+    objectives: sessionAttempt.patientSession.achievements,
+    timestamp: scoredAt,
+  });
   const sessionScore = computeSessionScore(achievementResults);
   const badgeTier = determineBadgeTier(sessionScore);
   const passEvaluation = evaluateSessionPass({
@@ -333,7 +343,7 @@ async function finalizeSessionAttemptFromSubmission({ sessionAttemptId, submissi
       data: {
         status: "SCORED",
         submittedAt: submission.submittedAt,
-        scoredAt: new Date(),
+        scoredAt,
         sessionScore,
         badgeTier,
         passed,

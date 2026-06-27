@@ -665,15 +665,45 @@ export const caseStyles = StyleSheet.create({
   debriefOverlay: {
     flex: 1,
     backgroundColor: "rgba(17,24,39,0.55)",
-    justifyContent: "center",
-    padding: 16,
+    justifyContent: "flex-start",
+    paddingHorizontal: 16,
+    paddingTop: 28,
+    paddingBottom: 16,
+  },
+
+  debriefPreceptorOverlay: {
+    width: "100%",
+    maxWidth: 560,
+    alignSelf: "center",
+    position: "relative",
+    overflow: "visible",
+  },
+
+  debriefPreceptorHeroLayer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 3,
+    elevation: 3,
+    alignItems: "center",
+  },
+
+  debriefPreceptorHeroLayerCompact: {
+    top: 8,
   },
 
   debriefCard: {
-    maxHeight: "90%",
-    borderRadius: 12,
+    marginTop: 132,
+    maxHeight: "68%",
+    borderRadius: 8,
     backgroundColor: "#ffffff",
     overflow: "hidden",
+  },
+
+  debriefCardCompact: {
+    marginTop: 116,
+    maxHeight: "70%",
   },
 
   achievementUnlockCard: {
@@ -713,45 +743,54 @@ export const caseStyles = StyleSheet.create({
     gap: 14,
   },
 
-  debriefHeaderRow: {
+  debriefFixedHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 92,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+    backgroundColor: "#ffffff",
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+
+  debriefIdentityRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     gap: 12,
   },
 
-  debriefAvatarCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#ede9fe",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  debriefAvatarText: {
-    color: "#5b21b6",
-    fontWeight: "800",
+  debriefFixedFooter: {
+    flexShrink: 0,
+    paddingTop: 10,
+    paddingBottom: 16,
+    paddingHorizontal: 12,
+    backgroundColor: "#ffffff",
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    gap: 10,
   },
 
   debriefHeaderText: {
     flex: 1,
   },
 
-  debriefEyebrow: {
-    color: "#6d28d9",
-    fontSize: 12,
+  debriefName: {
+    fontSize: 17,
     fontWeight: "800",
-    textTransform: "uppercase",
+    color: "#111827",
   },
 
-  debriefTitle: {
-    color: "#111827",
-    fontSize: 18,
-    fontWeight: "800",
+  debriefSpecialty: {
+    marginTop: 2,
+    color: "#6b7280",
+    fontWeight: "600",
   },
 
   debriefScoreRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
   },
 
@@ -770,11 +809,11 @@ export const caseStyles = StyleSheet.create({
     backgroundColor: "#ffffff",
   },
 
-  debriefVoiceHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: 10,
+  debriefContextLabel: {
+    color: "#6d28d9",
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
   },
 
   debriefVoiceControls: {
@@ -912,11 +951,14 @@ export const caseStyles = StyleSheet.create({
 
   debriefMetricBox: {
     flex: 1,
+    minWidth: 180,
+    minHeight: 126,
     borderWidth: 1,
     borderColor: "#e5e7eb",
     borderRadius: 8,
     padding: 10,
     backgroundColor: "#ffffff",
+    justifyContent: "center",
   },
 
   debriefMetricLabel: {
@@ -944,6 +986,16 @@ export const caseStyles = StyleSheet.create({
   debriefText: {
     color: "#1f2937",
     lineHeight: 20,
+  },
+
+  debriefCoachingList: {
+    gap: 4,
+  },
+
+  debriefCoachingPoint: {
+    color: "#4b5563",
+    fontWeight: "700",
+    lineHeight: 18,
   },
 
   debriefAchievementRow: {
@@ -981,6 +1033,98 @@ export const caseStyles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 10,
+  },
+
+  badgeVisualCard: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    minHeight: 92,
+  },
+
+  badgeVisualGold: {
+    borderColor: "#f59e0b",
+    backgroundColor: "#fffbeb",
+  },
+
+  badgeVisualSilver: {
+    borderColor: "#94a3b8",
+    backgroundColor: "#f8fafc",
+  },
+
+  badgeVisualBronze: {
+    borderColor: "#f97316",
+    backgroundColor: "#fff7ed",
+  },
+
+  badgeVisualNone: {
+    borderColor: "#d1d5db",
+    backgroundColor: "#f9fafb",
+  },
+
+  badgeVisualMark: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#ffffff",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+
+  badgeVisualMarkText: {
+    color: "#111827",
+    fontSize: 28,
+    fontWeight: "900",
+  },
+
+  badgeVisualText: {
+    alignItems: "center",
+    gap: 2,
+  },
+
+  badgeVisualLabel: {
+    color: "#111827",
+    fontSize: 15,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+
+  badgeVisualCopy: {
+    color: "#4b5563",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 17,
+    textAlign: "center",
+  },
+
+  resultsBadgeInline: {
+    alignSelf: "flex-start",
+    marginTop: 6,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+
+  resultsBadgeInlineText: {
+    color: "#111827",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+
+  resultsReviewBlock: {
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+    padding: 10,
+    gap: 5,
   },
 
   debriefSecondaryButton: {

@@ -272,14 +272,12 @@ export default function TodayScreen() {
               {signingOut ? "Signing out..." : "Sign Out"}
             </Text>
           </Pressable>
-          {__DEV__ ? (
-            <Pressable
-              onPress={() => router.push("/(tabs)/faculty")}
-              style={portfolioStyles.signOutButton}
-            >
-              <Text style={portfolioStyles.signOutButtonText}>Faculty</Text>
-            </Pressable>
-          ) : null}
+          <Pressable
+            onPress={() => router.push("/faculty")}
+            style={portfolioStyles.signOutButton}
+          >
+            <Text style={portfolioStyles.signOutButtonText}>Faculty</Text>
+          </Pressable>
         </View>
 
         {error ? (

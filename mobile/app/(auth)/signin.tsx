@@ -157,6 +157,12 @@ export default function SigninScreen() {
                 return;
             }
 
+            if (result.createdSessionId) {
+                await setActive({ session: result.createdSessionId });
+                router.replace("/(tabs)");
+                return;
+            }
+
             setIdentifier(resetEmail.trim());
             setPassword("");
             setResetCode("");

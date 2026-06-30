@@ -14,6 +14,14 @@ import { useRouter } from "expo-router";
 import { useAuth, useSignIn } from "@clerk/clerk-expo";
 import { authStyles } from "../../assets/styles/auth.styles";
 
+type AuthMode = "signin" | "verify-signin" | "reset-request" | "reset-code";
+
+type VerificationStep = {
+    level: "first" | "second";
+    strategy: "email_code" | "phone_code" | "totp" | "backup_code";
+    label: string;
+};
+
 export default function SigninScreen() {
     const router = useRouter();
     const { isLoaded: authLoaded, isSignedIn } = useAuth();
@@ -22,7 +30,9 @@ export default function SigninScreen() {
     const [identifier, setIdentifier] = useState("");
     const [password, setPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
-    const [authMode, setAuthMode] = useState<"signin" | "reset-request" | "reset-code">("signin");
+    const [authMode, setAuthMode] = useState<AuthMode>("signin");
+    const [verificationCode, setVerificationCode] = useState("");
+    const [verificationStep, setVerificationStep] = useState<VerificationStep | null>(null);
     const [resetEmail, setResetEmail] = useState("");
     const [resetCode, setResetCode] = useState("");
     const [resetPassword, setResetPassword] = useState("");
@@ -45,6 +55,73 @@ export default function SigninScreen() {
         );
     }
 
+    const completeSignIn = async (result: any) => {
+        if (result?.status === "complete" && result?.createdSessionId) {
+            await setActive({ session: result.createdSessionId });
+            router.replace("/(tabs)");
+            return true;
+        }
+        return false;
+    };
+
+    const codeFactorFrom = (factors?: any[] | null) =>
+        factors?.find((factor) => ["email_code", "phone_code", "totp", "backup_code"].includes(factor.strategy));
+
+    const factorLabel = (factor: any) => {
+        if (factor?.strategy === "email_code") return `Enter the code sent to ${factor.safeIdentifier || "your email"}.`;
+        if (factor?.strategy === "phone_code") return `Enter the code sent to ${factor.safeIdentifier || "your phone"}.`;
+        if (factor?.strategy === "totp") return "Enter the code from your authenticator app.";
+        if (factor?.strategy === "backup_code") return "Enter one of your backup codes.";
+        return "Enter your verification code.";
+    };
+
+    const beginAdditionalVerification = async (result: any) => {
+        const level = result?.status === "needs_first_factor" ? "first" : "second";
+        const factors = level === "first" ? result?.supportedFirstFactors : result?.supportedSecondFactors;
+        const factor = codeFactorFrom(factors);
+
+        if (!factor) {
+            setErrorMsg("This account requires an additional verification method that Clinicals does not support yet. Please use another sign-in method or contact support.");
+            return;
+        }
+
+        if (level === "first") {
+            if (factor.strategy === "email_code") {
+                await signIn.prepareFirstFactor({
+                    strategy: "email_code",
+                    emailAddressId: factor.emailAddressId,
+                });
+            } else if (factor.strategy === "phone_code") {
+                await signIn.prepareFirstFactor({
+                    strategy: "phone_code",
+                    phoneNumberId: factor.phoneNumberId,
+                });
+            } else {
+                setErrorMsg("This account requires an additional first-step verification method that Clinicals does not support yet.");
+                return;
+            }
+        } else if (factor.strategy === "email_code") {
+            await signIn.prepareSecondFactor({
+                strategy: "email_code",
+                emailAddressId: factor.emailAddressId,
+            });
+        } else if (factor.strategy === "phone_code") {
+            await signIn.prepareSecondFactor({
+                strategy: "phone_code",
+                phoneNumberId: factor.phoneNumberId,
+            });
+        }
+
+        setVerificationStep({
+            level,
+            strategy: factor.strategy,
+            label: factorLabel(factor),
+        });
+        setVerificationCode("");
+        setErrorMsg("");
+        setAuthMode("verify-signin");
+    };
+
     const handleSignIn = async () => {
         if (!signInLoaded || loading) return;
 
@@ -63,13 +140,19 @@ export default function SigninScreen() {
                 password,
             });
 
-            if (result.status !== "complete") {
-                setErrorMsg("Sign in requires additional verification.");
+            if (await completeSignIn(result)) return;
+
+            if (result.status === "needs_first_factor" || result.status === "needs_second_factor") {
+                await beginAdditionalVerification(result);
                 return;
             }
 
-            await setActive({ session: result.createdSessionId });
-            router.replace("/(tabs)");
+            if (result.status === "needs_new_password") {
+                setErrorMsg("This account requires a password update before sign-in. Use Forgot password? to reset your password.");
+                return;
+            }
+
+            setErrorMsg("Sign in requires an additional verification method that Clinicals does not support yet.");
         } catch (err: any) {
             const msg =
                 err?.errors?.[0]?.longMessage ||
@@ -93,8 +176,48 @@ export default function SigninScreen() {
     const returnToSignIn = () => {
         setErrorMsg("");
         setAuthMode("signin");
+        setVerificationCode("");
+        setVerificationStep(null);
         setResetCode("");
         setResetPassword("");
+    };
+
+    const handleVerifySignIn = async () => {
+        if (!signInLoaded || loading || !verificationStep) return;
+
+        const code = verificationCode.trim();
+        if (!code) {
+            setErrorMsg("Please enter your verification code.");
+            return;
+        }
+
+        setErrorMsg("");
+        setLoading(true);
+
+        try {
+            const params = { strategy: verificationStep.strategy, code };
+            const result =
+                verificationStep.level === "first"
+                    ? await signIn.attemptFirstFactor(params as any)
+                    : await signIn.attemptSecondFactor(params as any);
+
+            if (await completeSignIn(result)) return;
+
+            if (result.status === "needs_second_factor") {
+                await beginAdditionalVerification(result);
+                return;
+            }
+
+            setErrorMsg("Verification requires another step that Clinicals does not support yet.");
+        } catch (err: any) {
+            const msg =
+                err?.errors?.[0]?.longMessage ||
+                err?.errors?.[0]?.message ||
+                "Verification failed.";
+            setErrorMsg(msg);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSendResetCode = async () => {
@@ -157,11 +280,7 @@ export default function SigninScreen() {
                 return;
             }
 
-            if (result.createdSessionId) {
-                await setActive({ session: result.createdSessionId });
-                router.replace("/(tabs)");
-                return;
-            }
+            if (await completeSignIn(result)) return;
 
             setIdentifier(resetEmail.trim());
             setPassword("");
@@ -200,7 +319,11 @@ export default function SigninScreen() {
         
                 <Text style={authStyles.title}>Sign In</Text>
                 <Text style={authStyles.subtitle}>
-                    {authMode === "signin" ? "Welcome back." : "Reset your password."}
+                    {authMode === "signin"
+                        ? "Welcome back."
+                        : authMode === "verify-signin"
+                          ? "Complete verification."
+                          : "Reset your password."}
                 </Text>
 
                 {!!errorMsg && <Text style={authStyles.errorText}>{errorMsg}</Text>}
@@ -276,6 +399,46 @@ export default function SigninScreen() {
                             <Text style={authStyles.linkText}>
                                 New here? <Text style={authStyles.link}>Create an account</Text>
                             </Text>
+                        </TouchableOpacity>
+                    </>
+                ) : authMode === "verify-signin" ? (
+                    <>
+                        <Text style={authStyles.resetHelpText}>
+                            {verificationStep?.label || "Enter your verification code."}
+                        </Text>
+
+                        <View style={authStyles.inputContainer}>
+                            <TextInput
+                                value={verificationCode}
+                                onChangeText={setVerificationCode}
+                                placeholder="Verification code"
+                                autoCapitalize="none"
+                                autoCorrect={false}
+                                keyboardType={verificationStep?.strategy === "backup_code" ? "default" : "number-pad"}
+                                style={authStyles.textInput}
+                            />
+                        </View>
+
+                        <TouchableOpacity
+                            style={[
+                                authStyles.authButton,
+                                (!signInLoaded || loading || !verificationCode.trim()) && authStyles.buttonDisabled,
+                            ]}
+                            activeOpacity={0.8}
+                            disabled={!signInLoaded || loading || !verificationCode.trim()}
+                            onPress={handleVerifySignIn}
+                        >
+                            <Text style={authStyles.buttonText}>
+                                {loading ? "Verifying..." : "Verify and Sign In"}
+                            </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={authStyles.linkContainer}
+                            activeOpacity={0.8}
+                            onPress={returnToSignIn}
+                        >
+                            <Text style={authStyles.link}>Back to sign in</Text>
                         </TouchableOpacity>
                     </>
                 ) : authMode === "reset-request" ? (

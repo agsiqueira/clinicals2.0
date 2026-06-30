@@ -199,6 +199,11 @@ test("today returns a new learner briefing", async () => {
 
   assert.equal(today.recommendedEncounter.patientSessionSlug, "first-patient");
   assert.equal(today.recommendedEncounter.displayTitle, "Taylor Reed: Introduction & Chief Complaint");
+  assert.equal(today.activeRotation.slug, "unit-1-clinical-encounter");
+  assert.deepEqual(
+    today.activeRotation.sessions.map((session) => session.slug),
+    ["first-patient", "first-patient-hpi"]
+  );
   assert.match(today.dailyBriefing.motivation, /Welcome/);
   assert.match(today.dailyBriefing.focus, /professional introduction/);
   assert.equal(today.dailyBriefing.nextGoal.slug, "first-gold-badge");
@@ -223,6 +228,8 @@ test("today recommends the first available forward encounter", async () => {
   });
 
   assert.equal(today.recommendedEncounter.patientSessionSlug, "first-patient-hpi");
+  assert.equal(today.activeRotation.slug, "unit-1-clinical-encounter");
+  assert.equal(today.activeRotation.sessions.length, 2);
   assert.equal(today.recommendedEncounter.launchParams.requiresHpi, true);
   assert.match(today.dailyBriefing.focus, /HPI Summary|history/);
 });
@@ -238,6 +245,8 @@ test("today recommends a blocked retry when no forward session is available", as
   });
 
   assert.equal(today.recommendedEncounter.patientSessionSlug, "first-patient");
+  assert.equal(today.activeRotation.slug, "unit-1-clinical-encounter");
+  assert.equal(today.activeRotation.sessions.length, 2);
   assert.match(today.dailyBriefing.motivation, /84%/);
   assert.equal(today.dailyBriefing.nextGoal.type, "unlock");
   assert.equal(today.dailyBriefing.nextGoal.currentValue, 70);

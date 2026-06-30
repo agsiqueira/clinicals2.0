@@ -251,6 +251,34 @@ export const portfolioStyles = StyleSheet.create({
     padding: 10,
     gap: 3,
   },
+  todayJourneyRoster: {
+    marginBottom: 6,
+  },
+  todayRotationSurface: {
+    position: "relative",
+    zIndex: 1,
+  },
+  todayRotationSection: {
+    marginTop: 24,
+  },
+  todayFullRoadmapButton: {
+    marginTop: 4,
+    borderColor: "#c4b5fd",
+    backgroundColor: "#f5f3ff",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  todayFullRoadmapText: {
+    color: "#5b21b6",
+    fontWeight: "900",
+  },
+  todayAchievementCard: {
+    marginTop: 8,
+    padding: 13,
+    gap: 5,
+  },
   todayGoalTeaserLabel: {
     color: "#6d28d9",
     fontSize: 11,
@@ -265,12 +293,22 @@ export const portfolioStyles = StyleSheet.create({
     color: "#6b7280",
     fontSize: 12,
     fontWeight: "700",
+    lineHeight: 17,
   },
   mentorCallout: {
     borderLeftWidth: 3,
     borderColor: "#c7d2fe",
     paddingLeft: 10,
     gap: 4,
+  },
+  todayMentorNote: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderLeftWidth: 3,
+    borderColor: "#c7d2fe",
+    backgroundColor: "rgba(255, 255, 255, 0.86)",
+    borderRadius: 8,
+    padding: 12,
   },
   mentorCalloutLabel: {
     color: "#4c1d95",
@@ -353,6 +391,9 @@ export const portfolioStyles = StyleSheet.create({
   primaryCtaText: {
     color: "#ffffff",
     fontWeight: "800",
+  },
+  todayJourneyCta: {
+    marginTop: 8,
   },
   secondaryCta: {
     borderWidth: 1,

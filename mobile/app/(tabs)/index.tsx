@@ -11,10 +11,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth, useClerk, useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { api } from "../../src/api/client";
 import { portfolioStyles } from "../../assets/styles/portfolio.styles";
 import { CompactJourneyCard } from "../../src/components/CompactJourneyCard";
-import { EncounterNodeCard } from "../../src/components/EncounterNodeCard";
+import { RotationCard, type RotationUnit } from "../../src/components/RotationCard";
 
 type TodayIdentity = {
   professionalLevel?: number | null;
@@ -51,9 +52,12 @@ type TodayEncounter = {
   } | null;
 };
 
+type TodayRotation = RotationUnit;
+
 type TodayResponse = {
   identity?: TodayIdentity | null;
   recommendedEncounter?: TodayEncounter | null;
+  activeRotation?: TodayRotation | null;
   dailyBriefing?: {
     motivation?: string | null;
     focus?: string | null;
@@ -74,24 +78,6 @@ type TodayResponse = {
 };
 
 type TodayNextGoal = NonNullable<NonNullable<TodayResponse["dailyBriefing"]>["nextGoal"]>;
-
-function actionLabel(encounter?: TodayEncounter | null) {
-  if (!encounter) return "Open Roadmap";
-  if (encounter.status === "in_progress") return "Continue Encounter";
-  if (encounter.status === "completed") return "Retry Encounter";
-  return "Start Encounter";
-}
-
-function encounterDisplayParts(encounter?: TodayEncounter | null) {
-  const displayTitle = encounter?.displayTitle || encounter?.title || "Patient Encounter";
-  const [patientName, ...taskParts] = displayTitle.split(":");
-  const taskTitle = taskParts.join(":").trim();
-
-  return {
-    patientName: taskTitle ? patientName.trim() : "Patient",
-    taskTitle: taskTitle || displayTitle,
-  };
-}
 
 function goalProgressText(goal?: TodayNextGoal | null) {
   const current = Number(goal?.currentValue);
@@ -127,15 +113,19 @@ function mentorCoachingMessage({
   focus?: string | null;
   goalProgress?: ReturnType<typeof goalProgressText>;
 }) {
-  const pieces = [motivation, focus, goalProgress?.secondary]
-    .filter(Boolean)
-    .map((piece) => String(piece).trim().replace(/\s+/g, " "));
+  const cleanMotivation = String(motivation || "Let's make today focused and manageable.")
+    .trim()
+    .replace(/\s+/g, " ");
+  const cleanFocus = String(
+    focus || "Start with a professional introduction, explain your role, and invite the patient to share their main concern."
+  )
+    .trim()
+    .replace(/\s+/g, " ");
+  const unlockText = goalProgress?.secondary
+    ? ` ${goalProgress.secondary.replace(/^Goal:\s*/i, "You only need ")}.`
+    : "";
 
-  if (pieces.length === 0) {
-    return "Start with a professional introduction, then focus on the clinical task for this encounter.";
-  }
-
-  return Array.from(new Set(pieces)).join(" ");
+  return `${cleanMotivation} Today, focus on this: ${cleanFocus}${unlockText}`;
 }
 
 export default function TodayScreen() {
@@ -222,7 +212,15 @@ export default function TodayScreen() {
     focus: dailyBriefing.focus,
     goalProgress: nextGoalProgress,
   });
-  const recommendedDisplay = encounterDisplayParts(recommendedEncounter);
+  const todayRotationUnit = today?.activeRotation || null;
+  const forceRetrySessionIds = useMemo(() => {
+    if (recommendedEncounter?.status !== "completed") return undefined;
+    const sessionId =
+      recommendedEncounter.patientSessionId ||
+      recommendedEncounter.patientSessionSlug ||
+      "today-recommended";
+    return new Set([sessionId]);
+  }, [recommendedEncounter]);
 
   const openRecommendedSession = () => {
     if (!recommendedEncounter?.patientSessionSlug) {
@@ -300,49 +298,36 @@ export default function TodayScreen() {
           streakCount={streak.currentCount}
         />
 
-        <View style={portfolioStyles.nextSessionCard}>
-          <Text style={portfolioStyles.smallLabel}>Continue Your Journey</Text>
-          {recommendedEncounter ? (
-            <EncounterNodeCard
-              patientName={recommendedDisplay.patientName}
-              encounterTitle={recommendedDisplay.taskTitle}
-              patientSessionSlug={recommendedEncounter.patientSessionSlug}
-              caseId={recommendedEncounter.caseId}
-              status={recommendedEncounter.status || "available"}
-              tier={recommendedEncounter.badgeTier}
-              bestScore={recommendedEncounter.bestSessionScore}
-              estimatedTimeLabel={recommendedEncounter.estimatedTime?.label || null}
-              onPress={openRecommendedSession}
-              variant="today"
+        <View style={[portfolioStyles.mentorCallout, portfolioStyles.todayMentorNote]}>
+          <Text style={portfolioStyles.mentorCalloutLabel}>🩺 Dr. Martinez · Today&apos;s Guidance</Text>
+          <Text style={portfolioStyles.mentorCalloutText}>{mentorMessage}</Text>
+        </View>
+
+        <View style={portfolioStyles.todayRotationSection}>
+          {todayRotationUnit ? (
+            <RotationCard
+              unit={todayRotationUnit}
+              unitIndex={Math.max(0, Number(todayRotationUnit.sortOrder || 1) - 1)}
+              isLastRotation
+              showRail={false}
+              onSessionPress={openRecommendedSession}
+              forceRetrySessionIds={forceRetrySessionIds}
             />
           ) : (
             <Text style={portfolioStyles.nextSessionTitle}>
               You&apos;ve completed all currently available encounters.
             </Text>
           )}
-
-          {!!nextGoal && (
-            <View style={portfolioStyles.todayGoalTeaser}>
-              <Text style={portfolioStyles.todayGoalTeaserLabel}>Next achievement</Text>
-              <Text style={portfolioStyles.todayGoalTeaserText}>
-                {nextGoal.icon ? `${nextGoal.icon} ` : ""}
-                {nextGoal.title || "Clinical milestone"}
-              </Text>
-              {!!nextGoal.description && (
-                <Text style={portfolioStyles.todayGoalTeaserMeta}>{nextGoal.description}</Text>
-              )}
-            </View>
-          )}
-
-          <View style={portfolioStyles.mentorCallout}>
-            <Text style={portfolioStyles.mentorCalloutLabel}>🩺 Dr. Martinez · Mentor Guidance</Text>
-            <Text style={portfolioStyles.mentorCalloutText}>{mentorMessage}</Text>
-          </View>
-
-          <Pressable onPress={openRecommendedSession} style={portfolioStyles.primaryCta}>
-            <Text style={portfolioStyles.primaryCtaText}>{actionLabel(recommendedEncounter)}</Text>
-          </Pressable>
         </View>
+
+        <Pressable
+          onPress={() => router.push("/(tabs)/cases")}
+          style={[portfolioStyles.secondaryCta, portfolioStyles.todayFullRoadmapButton]}
+        >
+          <MaterialCommunityIcons name="map-marker-path" size={18} color="#5b21b6" />
+          <Text style={portfolioStyles.todayFullRoadmapText}>Full Roadmap</Text>
+          <MaterialCommunityIcons name="chevron-right" size={18} color="#5b21b6" />
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );

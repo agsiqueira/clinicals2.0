@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -17,19 +18,18 @@ import { casesStyles } from "../../assets/styles/cases.styles";
 import { portfolioStyles } from "../../assets/styles/portfolio.styles";
 import { CompactJourneyCard } from "../../src/components/CompactJourneyCard";
 import { ClinicalsChatComposer } from "../../src/components/ClinicalsChatComposer";
-import { EncounterNodeCard } from "../../src/components/EncounterNodeCard";
 import { MentorAvatar } from "../../src/components/MentorAvatar";
 import { PatientAvatar } from "../../src/components/PatientAvatar";
+import { RotationCard, rotationComplete } from "../../src/components/RotationCard";
 import { useEnglishSpeechTranscription } from "../../src/hooks/useEnglishSpeechTranscription";
 import { useSpeechPlayback } from "../../src/hooks/useSpeechPlayback";
 import { useVoicePreference } from "../../src/hooks/useVoicePreference";
+import { getItemAsync, setItemAsync } from "../../src/utils/storage";
 import {
   overviewEncounterTitle,
   overviewPatientName,
   overviewReasonForVisit,
   patientFacingText,
-  sessionDisplayParts,
-  unitDisplayTitle,
 } from "../../src/utils/clinicalDisplay";
 
 type AchievementSummary = {
@@ -82,6 +82,8 @@ type LearningPath = {
   } | null;
   units: RoadmapUnit[];
 };
+
+const SEEN_MILESTONES_STORAGE_KEY_PREFIX = "clinicals2:roadmap:seen-milestones";
 
 type JourneySummary = {
   professionalLevel?: number | null;
@@ -178,52 +180,6 @@ function badgeThresholdLabels(thresholds: SessionOverview["badgeThresholds"]) {
   };
 }
 
-function rotationTitle(unit: RoadmapUnit) {
-  return unitDisplayTitle(unit).replace(/^Unit\s+\d+\s*:\s*/i, "");
-}
-
-function rotationTheme(unit: RoadmapUnit) {
-  const order = Number(unit.sortOrder || 1);
-  const title = unitDisplayTitle(unit);
-
-  if (order === 2 || /seasonal|allerg/i.test(title)) {
-    return {
-      icon: "🌸",
-      description: "Practice focused history-taking for common outpatient symptoms.",
-      style: casesStyles.rotationCardSpring,
-      iconStyle: casesStyles.rotationIconSpring,
-    };
-  }
-
-  return {
-    icon: "🏥",
-    description:
-      "Practice professional introductions, rapport, and identifying the patient's main concern.",
-    style: casesStyles.rotationCardClinic,
-    iconStyle: casesStyles.rotationIconClinic,
-  };
-}
-
-function encounterStatusLabel(session: RoadmapSession) {
-  if (session.status === "locked") return "Locked";
-  if (session.status !== "completed") return "Available";
-  return null;
-}
-
-function rotationComplete(unit: RoadmapUnit) {
-  return unit.sessions.every(
-    (session) => session.status === "completed" && Number(session.bestSessionScore ?? -1) >= 84
-  );
-}
-
-function completedMasteryLabel(session: RoadmapSession) {
-  const score = session.bestSessionScore != null ? `${Math.round(Number(session.bestSessionScore))}%` : null;
-  if (session.badgeTier === "GOLD") return score ? `Gold · ${score}` : "Gold";
-  if (session.badgeTier === "SILVER") return score ? `Silver · ${score}` : "Silver";
-  if (session.badgeTier === "BRONZE") return score ? `Bronze · ${score}` : "Bronze";
-  return score ? `Complete · ${score}` : "Complete";
-}
-
 export default function HomeScreen() {
   const { userId: authUserId } = useAuth();
   const { user, isLoaded: userLoaded } = useUser();
@@ -257,9 +213,11 @@ export default function HomeScreen() {
   const [preceptorInput, setPreceptorInput] = useState("");
   const [preceptorSending, setPreceptorSending] = useState(false);
   const [preceptorError, setPreceptorError] = useState<string | null>(null);
+  const [animatingMilestoneIds, setAnimatingMilestoneIds] = useState<Set<string>>(() => new Set());
   const { voiceEnabled: mentorVoiceEnabled, setVoiceEnabled: setMentorVoiceEnabled } =
     useVoicePreference();
   const preceptorDialogueRef = useRef<ScrollView | null>(null);
+  const milestoneAnimationRefs = useRef<Record<string, Animated.Value>>({});
   const preceptorTranscription = useEnglishSpeechTranscription({
     onText: setPreceptorInput,
     onError: () => setPreceptorError("Could not transcribe audio. Please try again or type your question."),
@@ -284,6 +242,11 @@ export default function HomeScreen() {
     if (user?.imageUrl) headers["x-user-image"] = user.imageUrl;
     return headers;
   }, [authUserId, user]);
+
+  const milestoneStorageKey = useMemo(() => {
+    const userKey = userHeaders["x-clerk-user-id"] || "anonymous";
+    return `${SEEN_MILESTONES_STORAGE_KEY_PREFIX}:${userKey}`;
+  }, [userHeaders]);
 
   const displayName = useMemo(() => {
     const info =
@@ -340,6 +303,73 @@ export default function HomeScreen() {
   useEffect(() => {
     loadRoadmap();
   }, [loadRoadmap]);
+
+  useEffect(() => {
+    if (loadingRoadmap || learningPaths.length === 0) return;
+
+    let isMounted = true;
+    const achievedMilestoneIds = learningPaths
+      .flatMap((path) => path.units)
+      .filter(rotationComplete)
+      .map((unit) => unit.id);
+
+    if (achievedMilestoneIds.length === 0) return;
+
+    const animateNewMilestones = async () => {
+      const stored = await getItemAsync(milestoneStorageKey);
+      let seenIds: string[] = [];
+
+      try {
+        seenIds = stored ? JSON.parse(stored) : [];
+      } catch {
+        seenIds = [];
+      }
+
+      const seenSet = new Set(seenIds);
+      const newMilestoneIds = achievedMilestoneIds.filter((id) => !seenSet.has(id));
+      if (!isMounted || newMilestoneIds.length === 0) return;
+
+      const nextSeenIds = Array.from(new Set([...seenIds, ...newMilestoneIds]));
+      await setItemAsync(milestoneStorageKey, JSON.stringify(nextSeenIds));
+
+      setAnimatingMilestoneIds((current) => new Set([...current, ...newMilestoneIds]));
+
+      newMilestoneIds.forEach((id) => {
+        const scale = milestoneAnimationRefs.current[id] || new Animated.Value(1);
+        milestoneAnimationRefs.current[id] = scale;
+        scale.setValue(1);
+        Animated.sequence([
+          Animated.timing(scale, {
+            toValue: 1.14,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 0.96,
+            duration: 120,
+            useNativeDriver: true,
+          }),
+          Animated.timing(scale, {
+            toValue: 1,
+            duration: 160,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setAnimatingMilestoneIds((current) => {
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+          });
+        });
+      });
+    };
+
+    void animateNewMilestones();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [learningPaths, loadingRoadmap, milestoneStorageKey]);
 
   const openSessionOverview = useCallback(async (session: RoadmapSession) => {
     if (session.status === "locked") return;
@@ -530,91 +560,20 @@ export default function HomeScreen() {
               </View>
 
               {path.units.map((unit, unitIndex) => {
-                const theme = rotationTheme(unit);
-                const isRotationComplete = rotationComplete(unit);
-                const isLastRotation = unitIndex === path.units.length - 1;
+                if (!milestoneAnimationRefs.current[unit.id]) {
+                  milestoneAnimationRefs.current[unit.id] = new Animated.Value(1);
+                }
 
                 return (
-                  <View key={unit.id}>
-                    <View style={[casesStyles.rotationCard, theme.style]}>
-                      <View style={casesStyles.rotationHeader}>
-                        <View style={[casesStyles.rotationIcon, theme.iconStyle]}>
-                          <Text style={casesStyles.rotationIconText}>{theme.icon}</Text>
-                        </View>
-                        <View style={casesStyles.rotationHeaderText}>
-                          <Text style={casesStyles.rotationEyebrow}>
-                            Rotation {Number(unit.sortOrder || 1)}
-                          </Text>
-                          <Text style={casesStyles.rotationTitle}>{rotationTitle(unit)}</Text>
-                          <Text style={casesStyles.rotationDescription}>
-                            {theme.description}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={casesStyles.pathRail}>
-                        {unit.sessions.map((session, index) => {
-                          const display = sessionDisplayParts(session);
-                          const isLocked = session.status === "locked";
-                          const isCompleted = session.status === "completed";
-                          const isLast = index === unit.sessions.length - 1;
-                          const nextSessionLocked = unit.sessions[index + 1]?.status === "locked";
-                          const shouldRetry =
-                            isCompleted &&
-                            nextSessionLocked &&
-                            (Number(session.bestSessionScore ?? 0) < 84 ||
-                              session.badgeTier === "BRONZE" ||
-                              session.badgeTier === "SILVER");
-                          const chipLabel = shouldRetry
-                            ? "Retry"
-                            : isCompleted
-                              ? completedMasteryLabel(session)
-                              : encounterStatusLabel(session);
-
-                          return (
-                            <View key={session.id} style={casesStyles.encounterCardStack}>
-                              <EncounterNodeCard
-                                patientName={display.patientName}
-                                encounterTitle={display.taskTitle}
-                                patientSessionSlug={session.slug}
-                                status={session.status}
-                                tier={session.badgeTier}
-                                bestScore={session.bestSessionScore}
-                                statusLabel={chipLabel}
-                                disabled={isLocked}
-                                onPress={() => openSessionOverview(session)}
-                              />
-                              {!isLast && <View style={casesStyles.connectorLine} />}
-                            </View>
-                          );
-                        })}
-                      </View>
-
-                      <View
-                        style={[
-                          casesStyles.rotationMilestone,
-                          isRotationComplete
-                            ? casesStyles.rotationMilestoneComplete
-                            : casesStyles.rotationMilestoneUpcoming,
-                        ]}
-                      >
-                        <Text style={casesStyles.rotationMilestoneIcon}>
-                          {isRotationComplete ? "🏁" : "📜"}
-                        </Text>
-                        <View style={casesStyles.rotationMilestoneText}>
-                          <Text style={casesStyles.rotationMilestoneTitle}>
-                            {isRotationComplete ? "Rotation Complete" : "Clinical Milestone"}
-                          </Text>
-                          <Text style={casesStyles.rotationMilestoneBody}>
-                            {isRotationComplete
-                              ? "You've reached this clinical checkpoint."
-                              : "Complete each encounter with 84% or higher to reach this checkpoint."}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                    {!isLastRotation && <View style={casesStyles.rotationContinuationCue} />}
-                  </View>
+                  <RotationCard
+                    key={unit.id}
+                    unit={unit}
+                    unitIndex={unitIndex}
+                    isLastRotation={unitIndex === path.units.length - 1}
+                    onSessionPress={(session) => openSessionOverview(session as RoadmapSession)}
+                    animatingMilestoneIds={animatingMilestoneIds}
+                    milestoneTrophyScale={milestoneAnimationRefs.current[unit.id]}
+                  />
                 );
               })}
             </View>

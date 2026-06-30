@@ -178,6 +178,53 @@ function buildRecommendedEncounter(item) {
   };
 }
 
+function rotationComplete(unit) {
+  return (unit?.sessions || []).every(
+    (session) => session.status === "completed" && Number(session.bestSessionScore ?? -1) >= 84
+  );
+}
+
+function rotationHasUsefulWork(unit) {
+  return (unit?.sessions || []).some((session, index, sessions) => {
+    if (session.status === "available") return true;
+    if (session.status === "locked") return true;
+
+    const nextSessionLocked = sessions[index + 1]?.status === "locked";
+    return (
+      session.status === "completed" &&
+      nextSessionLocked &&
+      Number(session.bestSessionScore ?? 0) < 84
+    );
+  });
+}
+
+function findActiveRotation({ roadmap, recommendedItem, availableItem, retryItem }) {
+  const units = (roadmap || []).flatMap((path) => path.units || []);
+
+  if (recommendedItem?.unit) {
+    const recommendedUnit = units.find(
+      (unit) => unit.id === recommendedItem.unit.id || unit.slug === recommendedItem.unit.slug
+    );
+    if (recommendedUnit) return recommendedUnit;
+  }
+
+  if (availableItem?.unit) {
+    const availableUnit = units.find(
+      (unit) => unit.id === availableItem.unit.id || unit.slug === availableItem.unit.slug
+    );
+    if (availableUnit) return availableUnit;
+  }
+
+  if (retryItem?.unit) {
+    const retryUnit = units.find(
+      (unit) => unit.id === retryItem.unit.id || unit.slug === retryItem.unit.slug
+    );
+    if (retryUnit) return retryUnit;
+  }
+
+  return units.find(rotationHasUsefulWork) || units.find((unit) => !rotationComplete(unit)) || null;
+}
+
 function buildBlockedGoal(lockedItem, retryItem) {
   return {
     type: "unlock",
@@ -339,6 +386,7 @@ async function buildToday({ userId, client = prisma }) {
       streak: portfolio.streak,
     },
     recommendedEncounter: buildRecommendedEncounter(recommendedItem),
+    activeRotation: findActiveRotation({ roadmap, recommendedItem, availableItem, retryItem }),
     dailyBriefing: buildDailyBriefing({
       portfolio,
       recommendationKind,

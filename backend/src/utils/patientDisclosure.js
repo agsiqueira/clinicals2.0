@@ -8,8 +8,14 @@ const SENSITIVE_TOPICS = new Set([
   "flank_pain",
   "nausea",
   "vomiting",
+  "abdominal_pain",
+  "back_pain",
   "vaginal_discharge",
+  "vaginal_bleeding",
+  "genital_rash",
   "discharge",
+  "rectal_bleeding",
+  "rectal_discharge",
   "allergies",
   "medications",
   "past_medical_history",
@@ -37,10 +43,16 @@ const TOPIC_ALIASES = {
   fever: ["fever", "temperature"],
   chills: ["chills"],
   flank_pain: ["flank", "side pain", "back pain"],
+  abdominal_pain: ["abdominal pain", "belly pain", "stomach pain", "abdomen"],
+  back_pain: ["back pain"],
   nausea: ["nausea", "nauseous"],
   vomiting: ["vomit", "vomiting", "throwing up"],
   vaginal_discharge: ["vaginal discharge", "discharge"],
+  vaginal_bleeding: ["vaginal bleeding"],
+  genital_rash: ["genital rash", "rash"],
   discharge: ["discharge"],
+  rectal_bleeding: ["rectal bleeding"],
+  rectal_discharge: ["rectal discharge"],
   cough: ["cough"],
   wheezing: ["wheezing", "wheeze"],
   shortness_of_breath: ["shortness of breath", "trouble breathing", "breath"],
@@ -82,16 +94,27 @@ function humanizeKey(key) {
 
 function addFact(facts, fact) {
   if (!fact || !fact.id || fact.text == null) return;
-  const text = String(fact.text).trim();
+  const category = fact.category || "case_fact";
+  const sensitive = fact.sensitive ?? SENSITIVE_TOPICS.has(fact.topic);
+  const text = sanitizeFactText(String(fact.text).trim(), { category, sensitive });
   if (!text) return;
   facts.push({
     aliases: TOPIC_ALIASES[fact.topic] || [fact.topic],
     broadEligible: !SENSITIVE_TOPICS.has(fact.topic) && BROAD_TOPIC_ORDER.includes(fact.topic),
-    category: "case_fact",
-    sensitive: SENSITIVE_TOPICS.has(fact.topic),
+    category,
+    sensitive,
     ...fact,
     text,
   });
+}
+
+function sanitizeFactText(text, { category, sensitive }) {
+  if (!text || category === "pertinent_negative" || sensitive) return text;
+  return text
+    .replace(/\s*;\s*(no|denies|without)\b[^.;]*/gi, "")
+    .replace(/\bonly\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function topicFromPertinentNegative(value) {
@@ -99,10 +122,16 @@ function topicFromPertinentNegative(value) {
   if (text.includes("fever")) return "fever";
   if (text.includes("chill")) return "chills";
   if (text.includes("flank")) return "flank_pain";
+  if (text.includes("abdominal")) return "abdominal_pain";
+  if (text.includes("back pain")) return "back_pain";
   if (text.includes("nausea")) return "nausea";
   if (text.includes("vomit")) return "vomiting";
   if (text.includes("vaginal discharge")) return "vaginal_discharge";
+  if (text.includes("vaginal bleeding")) return "vaginal_bleeding";
+  if (text.includes("genital rash")) return "genital_rash";
   if (text.includes("discharge")) return "discharge";
+  if (text.includes("rectal bleeding")) return "rectal_bleeding";
+  if (text.includes("rectal discharge")) return "rectal_discharge";
   if (text.includes("shortness of breath")) return "shortness_of_breath";
   if (text.includes("wheez")) return "wheezing";
   if (text.includes("chest pain")) return "chest_pain";
@@ -162,6 +191,7 @@ function extractFacts(caseData) {
     if (!topic) return;
     addFact(facts, {
       id: `history.pertinent_negatives.${index}`,
+      category: "pertinent_negative",
       topic,
       text: value,
       order: 70 + index,
@@ -285,9 +315,10 @@ function selectAllowedFacts({ facts, question, disclosedFactIds = new Set() }) {
   const classification = classifyQuestion(question, facts);
 
   if (classification.topics.length > 0) {
-    return facts.filter(
+    const matchingFacts = facts.filter(
       (fact) => classification.topics.includes(fact.topic) && !disclosedFactIds.has(fact.id)
     );
+    return classification.isBroad ? matchingFacts.slice(0, 1) : matchingFacts;
   }
 
   if (classification.isBroad) {
@@ -338,12 +369,20 @@ function buildDisclosureState({ caseData, messages = [], disclosedFactIds }) {
     : inferDisclosedFactIds({ facts, messages });
   const turns = userMessages(messages);
   const latestQuestion = turns[turns.length - 1] || "";
+  const latestClassification = classifyQuestion(latestQuestion, facts);
   const allowedFacts = latestQuestion
     ? selectAllowedFacts({ facts, question: latestQuestion, disclosedFactIds: startingFactIds })
     : [];
   const allowedFactIds = new Set(allowedFacts.map((fact) => fact.id));
+  const hideForBroadQuestion = (fact) =>
+    latestClassification.isBroad &&
+    (fact.category === "pertinent_negative" || fact.sensitive) &&
+    !latestClassification.topics.includes(fact.topic);
   const alreadyDisclosedFacts = facts.filter(
-    (fact) => startingFactIds.has(fact.id) && !allowedFactIds.has(fact.id)
+    (fact) =>
+      startingFactIds.has(fact.id) &&
+      !allowedFactIds.has(fact.id) &&
+      !hideForBroadQuestion(fact)
   );
   const patientProfile = caseData?.patient_profile || {};
   const nextDisclosedFactIds = Array.from(

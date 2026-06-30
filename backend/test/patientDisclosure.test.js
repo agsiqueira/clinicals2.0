@@ -46,6 +46,31 @@ test("transcript replay advances broad disclosure to the next undisclosed fact",
   assert.equal(visibleCase.visible_facts.allowed_this_turn[0].topic, "onset");
 });
 
+test("broad questions do not expose negatives or red flags alongside the one allowed fact", async () => {
+  const caseData = await loadCase("uti_level1");
+  const state = buildDisclosureState({
+    caseData,
+    disclosedFactIds: [
+      "presenting_info.chief_complaint",
+      "history.old_carts.onset",
+      "history.pertinent_negatives.8",
+    ],
+    messages: [{ role: "user", content: "Tell me more." }],
+  });
+  const visibleFactsText = JSON.stringify(state.visibleCase.visible_facts);
+
+  assert.equal(state.visibleCase.visible_facts.allowed_this_turn.length, 1);
+  assert.deepEqual(state.allowedFactIds, ["history.old_carts.location"]);
+  assert.match(
+    state.visibleCase.visible_facts.allowed_this_turn[0].text,
+    /genital area/i
+  );
+  assert.doesNotMatch(
+    visibleFactsText,
+    /abdominal pain|fever|blood|flank|nausea|vomit|discharge|allerg|medication|medical history/i
+  );
+});
+
 test("specific questions reveal only matching facts", async () => {
   const caseData = await loadCase("uti_level1");
   const facts = extractFacts(caseData);

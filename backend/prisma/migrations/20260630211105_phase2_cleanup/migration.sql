@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "UserMotivationalAchievement_userId_motivationalAchievementId_ke" RENAME TO "UserMotivationalAchievement_userId_motivationalAchievementI_key";

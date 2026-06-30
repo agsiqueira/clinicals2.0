@@ -102,6 +102,7 @@ model Conversation {
   status      ConversationStatus @default(IN_PROGRESS)
   startedAt   DateTime           @default(now())
   submittedAt DateTime?
+  disclosedFactIds Json?
 
   user           User            @relation(fields: [userId], references: [id])
   patientCase    Case            @relation(fields: [caseId], references: [id])

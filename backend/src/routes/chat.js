@@ -1,7 +1,9 @@
 const express = require("express");
+const prisma = require("../db/prisma");
 const { loadCase } = require("../utils/caseLoader");
 const { sanitizeCase } = require("../utils/safeCase");
 const { buildPatientSystemPrompt } = require("../utils/patientPrompt");
+const { buildDisclosureState } = require("../utils/patientDisclosure");
 const { createPatientReply } = require("../llm/navigatorClient");
 
 const router = express.Router();
@@ -13,9 +15,46 @@ function cleanPatientReply(raw) {
     .trim();
 }
 
+function getClerkUserId(req) {
+  return req.header("x-clerk-user-id");
+}
+
+async function loadConversationForDisclosure({ req, conversationId, caseId }) {
+  if (!conversationId) return null;
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: String(conversationId) },
+    include: {
+      patientCase: true,
+      user: true,
+    },
+  });
+
+  if (!conversation) {
+    const error = new Error("Conversation not found");
+    error.status = 404;
+    throw error;
+  }
+
+  if (conversation.patientCase.caseId !== caseId) {
+    const error = new Error("conversationId does not match caseId");
+    error.status = 400;
+    throw error;
+  }
+
+  const clerkUserId = getClerkUserId(req);
+  if (clerkUserId && conversation.user.clerkUserId !== clerkUserId) {
+    const error = new Error("Forbidden");
+    error.status = 403;
+    throw error;
+  }
+
+  return conversation;
+}
+
 router.post("/", async (req, res, next) => {
   try {
-    const { caseId, messages } = req.body || {};
+    const { caseId, conversationId, messages } = req.body || {};
     if (!caseId || !Array.isArray(messages)) {
       res.status(400).json({ error: "caseId and messages are required" });
       return;
@@ -47,8 +86,20 @@ router.post("/", async (req, res, next) => {
       return;
     }
 
+    const conversation = await loadConversationForDisclosure({
+      req,
+      conversationId,
+      caseId,
+    });
+
     // Use the LLM for all turns so responses are not hardcoded by turn number.
-    const systemPrompt = buildPatientSystemPrompt(promptCase);
+    const disclosureState = buildDisclosureState({
+      caseData: promptCase,
+      messages: sanitizedMessages,
+      disclosedFactIds: conversation?.disclosedFactIds,
+    });
+    const { visibleCase, nextDisclosedFactIds } = disclosureState;
+    const systemPrompt = buildPatientSystemPrompt(visibleCase);
 
     const replyRaw = await createPatientReply({
       systemPrompt,
@@ -56,6 +107,13 @@ router.post("/", async (req, res, next) => {
     });
 
     const reply = cleanPatientReply(replyRaw);
+
+    if (conversation) {
+      await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: { disclosedFactIds: nextDisclosedFactIds },
+      });
+    }
 
     res.json({ reply, osce_opening: osceOpening });
   } catch (err) {

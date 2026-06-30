@@ -985,6 +985,13 @@ export const casesStyles = StyleSheet.create({
     borderBottomRightRadius: 8,
     gap: 10,
   },
+  preceptorComposer: {
+    marginHorizontal: 0,
+  },
+  preceptorComposerCompact: {
+    padding: 8,
+    gap: 6,
+  },
   preceptorHeader: {
     flexDirection: "row",
     alignItems: "center",

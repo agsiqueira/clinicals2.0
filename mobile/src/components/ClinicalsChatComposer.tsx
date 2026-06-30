@@ -1,5 +1,12 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import type { StyleProp, ViewStyle } from "react-native";
 
 type ClinicalsChatComposerProps = {
   value: string;
@@ -15,6 +22,7 @@ type ClinicalsChatComposerProps = {
   sending?: boolean;
   transcribing?: boolean;
   isRecording?: boolean;
+  containerStyle?: StyleProp<ViewStyle>;
 };
 
 export function ClinicalsChatComposer({
@@ -31,11 +39,12 @@ export function ClinicalsChatComposer({
   sending = false,
   transcribing = false,
   isRecording = false,
+  containerStyle,
 }: ClinicalsChatComposerProps) {
   const submit = onSubmit || onSend || (() => {});
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -76,6 +85,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: 4,
     padding: 10,
+    width: "100%",
+    maxWidth: "100%",
     borderWidth: 1,
     borderColor: "#ddd6fe",
     borderRadius: 8,
@@ -86,6 +97,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
     borderColor: "#ede9fe",
     borderRadius: 8,
@@ -97,6 +109,7 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     minWidth: 42,
+    flexShrink: 0,
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderWidth: 1,
@@ -106,12 +119,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sendButton: {
+    minWidth: 48,
+    flexShrink: 0,
     paddingVertical: 10,
     paddingHorizontal: 13,
     borderWidth: 1,
     borderColor: "#ddd6fe",
     borderRadius: 8,
     backgroundColor: "#ffffff",
+    alignItems: "center",
   },
   buttonText: {
     color: "#6d28d9",

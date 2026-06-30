@@ -1,4 +1,4 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
+import { DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
@@ -7,7 +7,6 @@ import "react-native-reanimated";
 
 import { ClerkLoaded, ClerkLoading, ClerkProvider, SignedIn, SignedOut } from "@clerk/clerk-expo";
 
-import { useColorScheme } from "@/hooks/use-color-scheme";
 import { getItemAsync, setItemAsync } from "../src/utils/storage";
 
 export const unstable_settings = {
@@ -24,15 +23,13 @@ const tokenCache = {
 };
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <ClerkProvider
       publishableKey={process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!}
       tokenCache={tokenCache}
     >
       <SafeAreaProvider style={{ flex: 1 }}>
-        <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+        <ThemeProvider value={DefaultTheme}>
           <ClerkLoading>
             <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
               <ActivityIndicator />
@@ -53,7 +50,7 @@ export default function RootLayout() {
               </Stack>
             </SignedOut>
           </ClerkLoaded>
-          <StatusBar style="auto" />
+          <StatusBar style="dark" />
         </ThemeProvider>
       </SafeAreaProvider>
     </ClerkProvider>

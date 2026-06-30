@@ -872,6 +872,10 @@ export default function HomeScreen() {
                       }
                       transcribing={preceptorTranscription.transcribing}
                       isRecording={preceptorTranscription.isRecording}
+                      containerStyle={[
+                        casesStyles.preceptorComposer,
+                        isNarrowScreen && casesStyles.preceptorComposerCompact,
+                      ]}
                     />
 
                     <View style={casesStyles.modalActions}>

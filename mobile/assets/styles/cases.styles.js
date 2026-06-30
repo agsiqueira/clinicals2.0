@@ -986,7 +986,11 @@ export const casesStyles = StyleSheet.create({
     gap: 10,
   },
   preceptorComposer: {
+    alignSelf: "stretch",
+    flexShrink: 1,
     marginHorizontal: 0,
+    maxWidth: "100%",
+    width: "auto",
   },
   preceptorComposerCompact: {
     padding: 8,

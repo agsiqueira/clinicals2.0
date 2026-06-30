@@ -41,6 +41,12 @@ export const authStyles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 12,
   },
+  successText: {
+    color: "#166534",
+    textAlign: "center",
+    fontWeight: "600",
+    marginBottom: 12,
+  },
   inputContainer: {
     marginBottom: 14,
     position: "relative",
@@ -80,6 +86,17 @@ export const authStyles = StyleSheet.create({
     fontWeight: "600",
     color: COLORS.white,
     textAlign: "center",
+  },
+  forgotPasswordLink: {
+    alignSelf: "flex-end",
+    marginBottom: 12,
+  },
+  resetHelpText: {
+    color: COLORS.textLight,
+    fontSize: 15,
+    lineHeight: 21,
+    textAlign: "center",
+    marginBottom: 14,
   },
   linkContainer: {
     alignItems: "center",

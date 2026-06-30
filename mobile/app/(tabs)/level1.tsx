@@ -1384,6 +1384,7 @@ export default function Level1Screen() {
         method: "POST",
         body: {
           caseId,
+          ...(conversationId ? { conversationId } : {}),
           messages: nextMessages.map((m) => ({
             role: m.role,
             content: m.content,

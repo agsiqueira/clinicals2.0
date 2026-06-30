@@ -2428,6 +2428,7 @@ export default function Level1Screen() {
                   value={input}
                   onChangeText={setInput}
                   placeholder="Ask the patient a question..."
+                  submitLabel="Ask"
                   editable={!sending}
                   onMicPress={isRecording ? stopRecordingAndTranscribe : startRecording}
                   micDisabled={sending || transcribing || recordingBusy}
@@ -2436,6 +2437,7 @@ export default function Level1Screen() {
                   onSend={send}
                   sendDisabled={sending || !input.trim()}
                   sending={sending}
+                  containerStyle={caseStyles.encounterComposer}
                 />
 
                 <View style={caseStyles.doneButtonContainer}>

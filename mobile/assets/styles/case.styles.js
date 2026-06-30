@@ -153,6 +153,14 @@ export const caseStyles = StyleSheet.create({
     paddingBottom: 76,
   },
 
+  encounterComposer: {
+    alignSelf: "stretch",
+    flexShrink: 1,
+    marginHorizontal: 0,
+    maxWidth: "100%",
+    width: "auto",
+  },
+
   messageBubble: {
     maxWidth: "85%",
     paddingVertical: 10,

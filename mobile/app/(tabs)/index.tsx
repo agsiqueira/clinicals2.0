@@ -15,7 +15,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { api } from "../../src/api/client";
 import { portfolioStyles } from "../../assets/styles/portfolio.styles";
 import { CompactJourneyCard } from "../../src/components/CompactJourneyCard";
-import { RotationCard, type RotationUnit } from "../../src/components/RotationCard";
+import { RotationCard, type RotationSession, type RotationUnit } from "../../src/components/RotationCard";
 
 type TodayIdentity = {
   professionalLevel?: number | null;
@@ -222,8 +222,10 @@ export default function TodayScreen() {
     return new Set([sessionId]);
   }, [recommendedEncounter]);
 
-  const openRecommendedSession = () => {
-    if (!recommendedEncounter?.patientSessionSlug) {
+  const openRotationSession = (session: RotationSession) => {
+    const patientSessionSlug = session.slug || recommendedEncounter?.patientSessionSlug;
+
+    if (!patientSessionSlug) {
       router.push("/(tabs)/cases");
       return;
     }
@@ -231,7 +233,7 @@ export default function TodayScreen() {
     router.push({
       pathname: "/(tabs)/cases",
       params: {
-        focusSessionSlug: recommendedEncounter.patientSessionSlug,
+        focusSessionSlug: patientSessionSlug,
         focusSessionToken: String(Date.now()),
       },
     });
@@ -308,7 +310,7 @@ export default function TodayScreen() {
               unitIndex={Math.max(0, Number(todayRotationUnit.sortOrder || 1) - 1)}
               isLastRotation
               showRail={false}
-              onSessionPress={openRecommendedSession}
+              onSessionPress={openRotationSession}
               forceRetrySessionIds={forceRetrySessionIds}
             />
           ) : (
